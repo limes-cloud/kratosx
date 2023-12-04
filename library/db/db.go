@@ -1,10 +1,10 @@
 package db
 
 import (
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
+	"sync"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/limes-cloud/kratosx/config"
-	"sync"
 
 	"github.com/glebarez/sqlite"
 	"github.com/limes-cloud/library/gte"
@@ -61,7 +61,7 @@ func Init(cfs map[string]*config.Database, watcher config.Watcher) {
 			panic("database init error :" + err.Error())
 		}
 
-		watcher("database."+key, func(value kratosConfig.Value) {
+		watcher("database."+key, func(value config.Value) {
 			if err := value.Scan(conf); err != nil {
 				log.Error("Database配置变更失败：%s", err.Error())
 				return

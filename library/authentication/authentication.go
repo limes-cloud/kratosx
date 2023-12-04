@@ -3,18 +3,18 @@ package authentication
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/casbin/casbin/v2"
 	"github.com/casbin/casbin/v2/model"
 	adapter "github.com/casbin/gorm-adapter/v3"
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-redis/redis/v8"
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/db"
 	"github.com/limes-cloud/kratosx/library/jwt"
 	rd "github.com/limes-cloud/kratosx/library/redis"
-	"strings"
-	"sync"
 )
 
 type Authentication interface {
@@ -87,7 +87,7 @@ func Init(conf *config.Authentication, watcher config.Watcher) {
 	instance.initWhitelist(conf.Whitelist)
 
 	whs := map[string]bool{}
-	watcher("authentication.whitelist", func(value kratosConfig.Value) {
+	watcher("authentication.whitelist", func(value config.Value) {
 		if err := value.Scan(&whs); err != nil {
 			log.Errorf("Authentication Whitelist 配置变更失败：%s", err.Error())
 			return
@@ -96,7 +96,7 @@ func Init(conf *config.Authentication, watcher config.Watcher) {
 	})
 
 	skips := make([]string, 0)
-	watcher("authentication.whitelist", func(value kratosConfig.Value) {
+	watcher("authentication.whitelist", func(value config.Value) {
 		if err := value.Scan(&skips); err != nil {
 			log.Errorf("Authentication SkipRole 配置变更失败：%s", err.Error())
 			return

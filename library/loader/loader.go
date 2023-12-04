@@ -1,12 +1,12 @@
 package loader
 
 import (
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/limes-cloud/kratosx/config"
 	"io"
 	"os"
 	"sync"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/limes-cloud/kratosx/config"
 )
 
 type loader struct {
@@ -41,7 +41,7 @@ func Init(conf map[string]string, watcher config.Watcher) {
 			panic("加载器初始化失败:" + err.Error())
 		}
 
-		watcher("loader."+key, func(value kratosConfig.Value) {
+		watcher("loader."+key, func(value config.Value) {
 			if err := value.Scan(&conf); err != nil {
 				log.Errorf("Loader配置变更失败：%s", err.Error())
 				return

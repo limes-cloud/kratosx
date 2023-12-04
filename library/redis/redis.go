@@ -2,11 +2,11 @@ package redis
 
 import (
 	"context"
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
+	"sync"
+
 	"github.com/go-kratos/kratos/v2/log"
 	goRedis "github.com/go-redis/redis/v8"
 	"github.com/limes-cloud/kratosx/config"
-	"sync"
 )
 
 type Redis interface {
@@ -41,7 +41,7 @@ func Init(cfs map[string]*config.Redis, watcher config.Watcher) {
 			panic("init redis error :" + err.Error())
 		}
 
-		watcher("redis."+key, func(value kratosConfig.Value) {
+		watcher("redis."+key, func(value config.Value) {
 			if err := value.Scan(conf); err != nil {
 				log.Errorf("Redis配置变更失败：%s", err.Error())
 				return

@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
+	"sync"
+	"time"
+
 	"github.com/go-kratos/kratos/v2/log"
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	jwtv4 "github.com/golang-jwt/jwt/v4"
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/redis"
-	"sync"
-	"time"
 )
 
 type Jwt interface {
@@ -52,7 +52,7 @@ func Init(conf *config.JWT, watcher config.Watcher) {
 
 	instance = &jwt{conf: conf}
 
-	watcher("jwt", func(value kratosConfig.Value) {
+	watcher("jwt", func(value config.Value) {
 		if err := value.Scan(conf); err != nil {
 			log.Errorf("JWT 配置变更失败：%s", err.Error())
 			return

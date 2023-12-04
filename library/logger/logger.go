@@ -1,14 +1,14 @@
 package logger
 
 import (
+	"os"
+
 	kratosZap "github.com/go-kratos/kratos/contrib/log/zap/v2"
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/limes-cloud/kratosx/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"os"
 )
 
 type LogField map[string]any
@@ -47,7 +47,7 @@ func Init(lc *config.Logger, watcher config.Watcher, fields LogField) {
 	instance = &logger{}
 	instance.initFactory(lc, fs)
 
-	watcher("log", func(value kratosConfig.Value) {
+	watcher("log", func(value config.Value) {
 		if err := value.Scan(lc); err != nil {
 			log.Errorf("配置变更失败：%v", err.Error())
 			return

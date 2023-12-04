@@ -1,7 +1,6 @@
 package pool
 
 import (
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/panjf2000/ants/v2"
@@ -46,7 +45,7 @@ func Init(conf *config.Pool, watcher config.Watcher) {
 
 	instance = &pool{pf: p}
 
-	watcher("pool.size", func(value kratosConfig.Value) {
+	watcher("pool.size", func(value config.Value) {
 		size, err := value.Int()
 		if err != nil {
 			log.Errorf("Pool配置变更失败：%s", err.Error())

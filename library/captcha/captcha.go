@@ -5,18 +5,18 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
+	"math"
+	"math/rand"
+	"strconv"
+	"sync"
+	"time"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/email"
 	"github.com/limes-cloud/kratosx/library/redis"
 	"github.com/mojocn/base64Captcha"
-	"math"
-	"math/rand"
-	"strconv"
-	"sync"
-	"time"
 )
 
 type Captcha interface {
@@ -56,7 +56,7 @@ func Init(cfs map[string]*config.Captcha, watcher config.Watcher) {
 
 		instance.initFactory(key, conf)
 
-		watcher("captcha."+key, func(value kratosConfig.Value) {
+		watcher("captcha."+key, func(value config.Value) {
 			if err := value.Scan(conf); err != nil {
 				log.Errorf("Captcha 配置变更失败：%s", err.Error())
 				return

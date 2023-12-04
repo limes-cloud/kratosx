@@ -1,12 +1,12 @@
 package email
 
 import (
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/limes-cloud/kratosx/config"
 	"io"
 	"os"
 	"sync"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/limes-cloud/kratosx/config"
 )
 
 type Email interface {
@@ -44,7 +44,7 @@ func Init(conf *config.Email, watcher config.Watcher) {
 			panic("Email 初始化失败 :" + err.Error())
 		}
 
-		watcher("email.template."+key, func(value kratosConfig.Value) {
+		watcher("email.template."+key, func(value config.Value) {
 			if err := value.Scan(&tpc); err != nil {
 				log.Errorf("Email Template 配置变更失败：%s", err.Error())
 				return

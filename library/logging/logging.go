@@ -1,10 +1,10 @@
 package logging
 
 import (
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
+	"sync"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/limes-cloud/kratosx/config"
-	"sync"
 )
 
 type logging struct {
@@ -33,7 +33,7 @@ func Init(ec *config.Logging, watcher config.Watcher) {
 	}
 
 	newConf := map[string]bool{}
-	watcher("logging.whitelist", func(value kratosConfig.Value) {
+	watcher("logging.whitelist", func(value config.Value) {
 		if err := value.Scan(&newConf); err != nil {
 			log.Errorf("Logging 配置变更失败：%s", err.Error())
 			return
