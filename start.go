@@ -1,6 +1,8 @@
 package kratosx
 
 import (
+	"os"
+
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/config/file"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
@@ -8,7 +10,6 @@ import (
 	"github.com/limes-cloud/kratosx/library"
 	"github.com/limes-cloud/kratosx/library/logger"
 	"github.com/limes-cloud/kratosx/middleware"
-	"os"
 )
 
 const (
@@ -38,11 +39,6 @@ func New(opts ...Option) *kratos.App {
 		opt(o)
 	}
 
-	// 必须注册服务
-	if o.regSrvFn == nil {
-		panic("must register server")
-	}
-
 	// 加载配置
 	if err := o.config.Load(); err != nil {
 		panic(err)
@@ -54,18 +50,23 @@ func New(opts ...Option) *kratos.App {
 	// 获取中间件
 	mds := middleware.New(o.config)
 
-	// 注册服务
-	hs := httpServer(o.config.App().Server.Http, mds)
-	gs := grpcServer(o.config.App().Server.Grpc, mds)
-	o.regSrvFn(o.config, hs, gs)
-
 	defOpts := []kratos.Option{
 		kratos.ID(id),
 		kratos.Name(name),
 		kratos.Version(version),
 		kratos.Metadata(map[string]string{}),
-		kratos.Logger(logger.Instance()),
-		kratos.Server(hs, gs),
+	}
+
+	// 必注册服务
+	if o.regSrvFn != nil {
+		hs := httpServer(o.config.App().Server.Http, mds)
+		gs := grpcServer(o.config.App().Server.Grpc, mds)
+		o.regSrvFn(o.config, hs, gs)
+		defOpts = append(defOpts, kratos.Server(hs, gs))
+	}
+
+	if o.config.App().Log != nil {
+		defOpts = append(defOpts, kratos.Logger(logger.Instance()))
 	}
 
 	defOpts = append(defOpts, o.kOpts...)
