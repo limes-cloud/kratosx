@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"context"
+	"strings"
+
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/middleware"
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
@@ -11,7 +13,6 @@ import (
 	jwtv4 "github.com/golang-jwt/jwt/v4"
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/jwt"
-	"strings"
 )
 
 func Jwt(conf *config.JWT) middleware.Middleware {
@@ -44,6 +45,10 @@ func Jwt(conf *config.JWT) middleware.Middleware {
 }
 
 func JwtBlack(conf *config.JWT) middleware.Middleware {
+	if conf == nil {
+		return nil
+	}
+
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 
