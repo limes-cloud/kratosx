@@ -48,7 +48,6 @@ func JwtBlack(conf *config.JWT) middleware.Middleware {
 	if conf == nil {
 		return nil
 	}
-
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 
