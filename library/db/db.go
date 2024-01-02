@@ -1,18 +1,19 @@
 package db
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/limes-cloud/kratosx/config"
-
-	"github.com/glebarez/sqlite"
-	"github.com/limes-cloud/library/gte"
+	"gorm.io/driver/clickhouse"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlserver"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+
+	"github.com/limes-cloud/kratosx/config"
+	gte "github.com/limes-cloud/kratosx/library/db/gormtranserror"
 )
 
 type DB interface {
@@ -29,9 +30,9 @@ type db struct {
 const (
 	_mysql      = "mysql"
 	_postgresql = "postgresql"
-	_sqlite     = "sqlite"
 	_sqlServer  = "sqlServer"
 	_tidb       = "tidb"
+	_clickhouse = "clickhouse"
 )
 
 var instance *db
@@ -70,7 +71,6 @@ func Init(cfs map[string]*config.Database, watcher config.Watcher) {
 				log.Errorf("Database变更重载失败：%s", err.Error())
 			}
 		})
-
 	}
 
 	// 如果配置了多个库，则不能启用快速获取
@@ -85,23 +85,32 @@ func (d *db) initFactory(name string, conf *config.Database) error {
 		return nil
 	}
 
+	if conf.AutoCreate {
+		if err := d.create(conf); err != nil {
+			panic("auto create database error:" + err.Error())
+		}
+	}
+
 	// 连接主数据库
-	client, err := gorm.Open(d.open(conf.Drive, conf.Dsn), &gorm.Config{
-		Logger: newLog(conf.LogLevel, conf.SlowThreshold),
+	client, err := gorm.Open(d.open(conf), &gorm.Config{
+		Logger: newLog(conf.Config.LogLevel, conf.Config.SlowThreshold),
 		NamingStrategy: schema.NamingStrategy{
-			TablePrefix:   conf.TablePrefix,
+			TablePrefix:   conf.Config.TablePrefix,
 			SingularTable: true,
 		},
+		PrepareStmt: conf.Config.PrepareStmt,
+		DryRun:      conf.Config.DryRun,
 	})
 	if err != nil {
 		return err
 	}
 
-	if conf.TransformError != nil {
+	if conf.Config.TransformError.Enable {
 		opts := []gte.Option{
 			gte.WithEnableLoad(),
 		}
-		format := conf.TransformError.Format
+
+		format := conf.Config.TransformError.Format
 		if format != nil {
 			if format.AddForeign != nil {
 				opts = append(opts, gte.WithAddForeignKeyFormat(*format.AddForeign))
@@ -113,13 +122,15 @@ func (d *db) initFactory(name string, conf *config.Database) error {
 				opts = append(opts, gte.WithDuplicatedKeyFormat(*format.Duplicated))
 			}
 		}
-		gte.NewGormErrorPlugin(opts...)
+		if err := gte.NewGlobalGormErrorPlugin(opts...).Initialize(client); err != nil {
+			panic("gorm transform error:" + err.Error())
+		}
 	}
 
 	sdb, _ := client.DB()
-	sdb.SetConnMaxLifetime(conf.MaxLifetime)
-	sdb.SetMaxOpenConns(conf.MaxOpenConn)
-	sdb.SetMaxIdleConns(conf.MaxIdleConn)
+	sdb.SetConnMaxLifetime(conf.Config.MaxLifetime)
+	sdb.SetMaxOpenConns(conf.Config.MaxOpenConn)
+	sdb.SetMaxIdleConns(conf.Config.MaxIdleConn)
 
 	d.mu.Lock()
 	d.set[name] = client
@@ -149,17 +160,61 @@ func (d *db) Get(name ...string) *gorm.DB {
 	return d.set[key]
 }
 
-func (d *db) open(drive, dsn string) gorm.Dialector {
-	switch drive {
+func (d *db) open(conf *config.Database) gorm.Dialector {
+	switch conf.Drive {
 	case _mysql, _tidb:
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s%s",
+			conf.Connect.Username,
+			conf.Connect.Password,
+			conf.Connect.Host,
+			conf.Connect.Port,
+			conf.Connect.DBName,
+			conf.Connect.Option,
+		)
 		return mysql.Open(dsn)
 	case _postgresql:
+		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d %s",
+			conf.Connect.Host,
+			conf.Connect.Username,
+			conf.Connect.Password,
+			conf.Connect.DBName,
+			conf.Connect.Port,
+			conf.Connect.Option,
+		)
 		return postgres.Open(dsn)
-	case _sqlite:
-		return sqlite.Open(dsn)
 	case _sqlServer:
+		dsn := fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s",
+			conf.Connect.Username,
+			conf.Connect.Password,
+			conf.Connect.Host,
+			conf.Connect.Port,
+			conf.Connect.DBName,
+		)
 		return sqlserver.Open(dsn)
+	case _clickhouse:
+		dsn := fmt.Sprintf("tcp://%s:%d?database=%s&username=%s&password=%s%s",
+			conf.Connect.Host,
+			conf.Connect.Port,
+			conf.Connect.DBName,
+			conf.Connect.Username,
+			conf.Connect.Password,
+			conf.Connect.Option,
+		)
+		return clickhouse.Open(dsn)
 	default:
 		return nil
 	}
+}
+
+func (d *db) create(conf *config.Database) error {
+	copyConf := *conf
+	copyConf.Connect.DBName = ""
+	copyConf.Connect.Option = ""
+
+	connect, err := gorm.Open(d.open(&copyConf))
+	if err != nil {
+		return err
+	}
+	_ = connect.Exec(fmt.Sprintf("create database %s", conf.Connect.DBName))
+	return nil
 }

@@ -5,9 +5,10 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/go-kratos/kratos/v2/transport/http"
+	"google.golang.org/protobuf/encoding/protojson"
+
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/server"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func grpcServer(c *config.GrpcService, md []middleware.Middleware) *grpc.Server {
@@ -47,8 +48,8 @@ func httpServer(c *config.HttpService, md []middleware.Middleware) *http.Server 
 	}
 	if c.Marshal != nil {
 		json.MarshalOptions = protojson.MarshalOptions{
-			EmitUnpopulated: c.Marshal.EmitUnpopulated, //默认值不忽略
-			UseProtoNames:   c.Marshal.UseProtoNames,   //使用proto name返回http字段
+			EmitUnpopulated: c.Marshal.EmitUnpopulated, // 默认值不忽略
+			UseProtoNames:   c.Marshal.UseProtoNames,   // 使用proto name返回http字段
 		}
 	}
 	return http.NewServer(opts...)

@@ -43,21 +43,37 @@ type HttpService struct {
 }
 
 type Database struct {
-	Enable         bool
+	Enable     bool
+	Drive      string
+	AutoCreate bool
+	Connect    DBConnect
+	Config     DBConfig
+}
+
+type DBConnect struct {
+	Username string
+	Password string
+	Host     string
+	Port     int
+	Option   string
+	DBName   string
+}
+
+type DBConfig struct {
 	TablePrefix    string
-	Drive          string
-	Dsn            string
-	MaxLifetime    time.Duration
-	MaxOpenConn    int
-	MaxIdleConn    int
+	Connect        DBConnect
 	LogLevel       int
 	PrepareStmt    bool
 	DryRun         bool
 	TransformError *DBTransformError
 	SlowThreshold  time.Duration
+	MaxLifetime    time.Duration
+	MaxOpenConn    int
+	MaxIdleConn    int
 }
 
 type DBTransformError struct {
+	Enable bool
 	Format *struct {
 		Duplicated *string
 		AddForeign *string

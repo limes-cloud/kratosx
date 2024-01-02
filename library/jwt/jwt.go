@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"sync"
 	"time"
 
@@ -127,13 +128,25 @@ func (j *jwt) SetToken(ctx context.Context, token string) context.Context {
 }
 
 func (j *jwt) Renewal(ctx context.Context) (string, error) {
-	res, err := j.ParseMapClaims(ctx)
-	if err != nil {
-		return "", err
+	token := j.GetToken(ctx)
+	if token == "" {
+		return "", errors.New("token is miss")
+	}
+
+	tokenInfo, _ := jwtv4.Parse(token, func(token *jwtv4.Token) (interface{}, error) {
+		return []byte(j.conf.Secret), nil
+	})
+	if tokenInfo == nil || tokenInfo.Claims == nil {
+		return "", errors.New("token parse error")
+	}
+
+	claims, is := tokenInfo.Claims.(jwtv4.MapClaims)
+	if !is {
+		return "", errors.New("token format error")
 	}
 
 	// 判断token失效是否超过10s
-	exp := int64(res["exp"].(float64))
+	exp := int64(claims["exp"].(float64))
 	now := time.Now().Unix()
 	if exp > now {
 		return "", errors.New("token is alive")
@@ -143,13 +156,31 @@ func (j *jwt) Renewal(ctx context.Context) (string, error) {
 		return "", errors.New("token is over max renewal time")
 	}
 
-	return j.NewToken(res)
+	return j.NewToken(claims)
 }
 
 func (j *jwt) IsWhitelist(path string) bool {
 	j.rw.RLock()
 	defer j.rw.RUnlock()
-	return j.conf.Whitelist[path]
+
+	if j.conf.Whitelist[path] {
+		return true
+	}
+
+	for p, _ := range j.conf.Whitelist {
+		// 将*替换为匹配任意多字符的正则表达式
+		pattern := "^" + p + "$"
+		pattern = regexp.MustCompile("/\\*").ReplaceAllString(pattern, "/.+")
+
+		// 编译正则表达式
+		re := regexp.MustCompile(pattern)
+
+		// 检查输入是否匹配正则表达式
+		if re.MatchString(path) {
+			return true
+		}
+	}
+	return false
 }
 
 func (j *jwt) IsBlacklist(token string) bool {
@@ -163,5 +194,7 @@ func (j *jwt) IsBlacklist(token string) bool {
 
 func (j *jwt) AddBlacklist(token string) {
 	rd := redis.Instance().Get(j.conf.Redis)
-	rd.HSet(context.Background(), blackPrefix, token, 1, j.conf.Expire)
+	if rd != nil {
+		rd.HSet(context.Background(), blackPrefix, token, 1, j.conf.Expire)
+	}
 }

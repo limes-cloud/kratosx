@@ -6,11 +6,13 @@ import (
 	"strings"
 	"sync"
 
+	rediswatcher "github.com/billcobbler/casbin-redis-watcher/v2"
 	"github.com/casbin/casbin/v2"
 	"github.com/casbin/casbin/v2/model"
 	adapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-redis/redis/v8"
+
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/db"
 	"github.com/limes-cloud/kratosx/library/jwt"
@@ -60,6 +62,16 @@ func Init(conf *config.Authentication, watcher config.Watcher) {
 		panic("authentication init error not exist redis " + conf.DB)
 	}
 
+	// 初始化监听器
+	w, err := rediswatcher.NewWatcher(
+		rdi.Options().Addr,
+		rediswatcher.Username(rdi.Options().Username),
+		rediswatcher.Password(rdi.Options().Password),
+	)
+	if err != nil {
+		panic("authentication init watcher error:" + err.Error())
+	}
+
 	m := model.NewModel()
 	m.AddDef("r", "r", "sub, obj, act")
 	m.AddDef("p", "p", "sub, obj, act")
@@ -75,6 +87,13 @@ func Init(conf *config.Authentication, watcher config.Watcher) {
 	if err = object.LoadPolicy(); err != nil {
 		panic("authentication init error:" + err.Error())
 	}
+
+	// 设置监听器
+	_ = object.SetWatcher(w)
+	_ = w.SetUpdateCallback(func(s string) {
+		_ = object.LoadPolicy()
+		log.Errorf("casbin watch load policy")
+	})
 
 	instance = &authentication{
 		enforcer: object,
@@ -103,7 +122,6 @@ func Init(conf *config.Authentication, watcher config.Watcher) {
 		}
 		instance.initSkipRole(skips)
 	})
-
 }
 
 func (a *authentication) initWhitelist(whs map[string]bool) {
