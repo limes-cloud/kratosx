@@ -105,7 +105,7 @@ func (d *db) initFactory(name string, conf *config.Database) error {
 		return err
 	}
 
-	if conf.Config.TransformError.Enable {
+	if conf.Config.TransformError != nil && conf.Config.TransformError.Enable {
 		opts := []gte.Option{
 			gte.WithEnableLoad(),
 		}
