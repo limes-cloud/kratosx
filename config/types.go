@@ -8,6 +8,7 @@ type App struct {
 	ID      string
 	Name    string
 	Version string
+	Env     string
 	Server  *struct {
 		Http *HttpService
 		Grpc *GrpcService

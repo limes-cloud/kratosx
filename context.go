@@ -2,29 +2,30 @@ package kratosx
 
 import (
 	"context"
+	"time"
+
 	"github.com/go-kratos/kratos/v2"
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/metadata"
 	md "github.com/go-kratos/kratos/v2/metadata"
 	"github.com/go-redis/redis/v8"
+	"gorm.io/gorm"
+
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/authentication"
 	"github.com/limes-cloud/kratosx/library/captcha"
+	"github.com/limes-cloud/kratosx/library/db"
 	"github.com/limes-cloud/kratosx/library/email"
 	"github.com/limes-cloud/kratosx/library/ip"
 	"github.com/limes-cloud/kratosx/library/jwt"
 	"github.com/limes-cloud/kratosx/library/loader"
 	"github.com/limes-cloud/kratosx/library/logger"
 	"github.com/limes-cloud/kratosx/library/pool"
-	"gorm.io/gorm"
-	"time"
-
-	"github.com/limes-cloud/kratosx/library/db"
 	rd "github.com/limes-cloud/kratosx/library/redis"
-
-	"github.com/go-kratos/kratos/v2/log"
 )
 
 type Context interface {
+	Env() string
 	Logger() *log.Helper
 	DB(name ...string) *gorm.DB
 	Go(runner pool.Runner) error
@@ -141,6 +142,11 @@ func (c *ctx) SetMetadata(key, value string) {
 // Config 获取配置对象
 func (c *ctx) Config() config.Config {
 	return config.Instance()
+}
+
+// Env 获取配置环境
+func (c *ctx) Env() string {
+	return c.Config().App().Env
 }
 
 func (c *ctx) Deadline() (deadline time.Time, ok bool) {
