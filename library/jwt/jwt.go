@@ -11,6 +11,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	jwtv4 "github.com/golang-jwt/jwt/v4"
+
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/redis"
 )
@@ -133,7 +134,7 @@ func (j *jwt) Renewal(ctx context.Context) (string, error) {
 		return "", errors.New("token is miss")
 	}
 
-	tokenInfo, _ := jwtv4.Parse(token, func(token *jwtv4.Token) (interface{}, error) {
+	tokenInfo, _ := jwtv4.Parse(token, func(token *jwtv4.Token) (any, error) {
 		return []byte(j.conf.Secret), nil
 	})
 	if tokenInfo == nil || tokenInfo.Claims == nil {
@@ -167,10 +168,10 @@ func (j *jwt) IsWhitelist(path string) bool {
 		return true
 	}
 
-	for p, _ := range j.conf.Whitelist {
+	for p := range j.conf.Whitelist {
 		// 将*替换为匹配任意多字符的正则表达式
 		pattern := "^" + p + "$"
-		pattern = regexp.MustCompile("/\\*").ReplaceAllString(pattern, "/.+")
+		pattern = regexp.MustCompile(`/\*`).ReplaceAllString(pattern, "/.+")
 
 		// 编译正则表达式
 		re := regexp.MustCompile(pattern)

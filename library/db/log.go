@@ -4,29 +4,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/go-kratos/kratos/v2/log"
-	libLogger "github.com/limes-cloud/kratosx/library/logger"
-	"gorm.io/gorm/logger"
 	"time"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"gorm.io/gorm/logger"
+
+	libLogger "github.com/limes-cloud/kratosx/library/logger"
 )
 
 // zap 适配gorm 日志
 type sqlLog struct {
-	logger        log.Logger
+	logger        *log.Helper
 	LogLevel      logger.LogLevel
 	SlowThreshold time.Duration
 }
 
 func newLog(level int, slow time.Duration) logger.Interface {
 	return &sqlLog{
-		logger:        libLogger.Instance(),
+		logger:        libLogger.Helper(libLogger.AddCallerSkip(4)),
 		LogLevel:      logger.LogLevel(level),
 		SlowThreshold: slow,
 	}
 }
 
 func (l *sqlLog) Log(ctx context.Context) *log.Helper {
-	return log.Context(ctx)
+	return l.logger.WithContext(ctx)
 }
 
 func (l *sqlLog) LogMode(level logger.LogLevel) logger.Interface {

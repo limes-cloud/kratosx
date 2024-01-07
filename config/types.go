@@ -151,9 +151,12 @@ type Authentication struct {
 }
 
 type Logger struct {
-	Level  int8
-	Output []string
-	File   *struct {
+	Level      int8
+	Output     []string
+	EnCoder    string
+	Caller     bool
+	CallerSkip *int
+	File       *struct {
 		Name      string
 		MaxSize   int
 		MaxBackup int

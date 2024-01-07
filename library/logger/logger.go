@@ -5,29 +5,33 @@ import (
 
 	kratosZap "github.com/go-kratos/kratos/contrib/log/zap/v2"
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/limes-cloud/kratosx/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
+
+	"github.com/limes-cloud/kratosx/config"
 )
 
 type LogField map[string]any
 
 type logger struct {
-	log log.Logger
+	zap *zap.Logger
+	fs  []any
 }
 
-var instance *logger
+var ins *logger
 
-func Instance() log.Logger {
-	if instance == nil {
-		return log.GetLogger()
+func Instance(opts ...Option) log.Logger {
+	o := &options{}
+	for _, opt := range opts {
+		opt(o)
 	}
-	return instance.log
+	zapLog := ins.zap.WithOptions(zap.AddCallerSkip(o.callerSkip))
+	return log.With(kratosZap.NewLogger(zapLog), ins.fs...)
 }
 
-func Helper() *log.Helper {
-	return log.NewHelper(instance.log)
+func Helper(opts ...Option) *log.Helper {
+	return log.NewHelper(Instance(opts...))
 }
 
 // Init 初始化日志器
@@ -44,8 +48,8 @@ func Init(lc *config.Logger, watcher config.Watcher, fields LogField) {
 	}
 
 	// 初始化
-	instance = &logger{}
-	instance.initFactory(lc, fs)
+	ins = &logger{}
+	ins.initFactory(lc, fs)
 
 	watcher("log", func(value config.Value) {
 		if err := value.Scan(lc); err != nil {
@@ -53,18 +57,21 @@ func Init(lc *config.Logger, watcher config.Watcher, fields LogField) {
 			return
 		}
 		// 变更初始化
-		instance.initFactory(lc, fs)
+		ins.initFactory(lc, fs)
 	})
 }
 
 func (l *logger) initFactory(conf *config.Logger, fs []any) {
 	// 创建zap logger
-	l.log = log.With(l.newZapLogger(conf), fs...)
+	l.zap = l.newZapLogger(conf)
+	l.fs = fs
+
+	gLog := log.With(kratosZap.NewLogger(l.zap), fs...)
 	// 设置全局logger
-	log.SetLogger(instance.log)
+	log.SetLogger(gLog)
 }
 
-func (l *logger) newZapLogger(conf *config.Logger) *kratosZap.Logger {
+func (l *logger) newZapLogger(conf *config.Logger) *zap.Logger {
 	// 编码器配置
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:        "time",
@@ -97,11 +104,28 @@ func (l *logger) newZapLogger(conf *config.Logger) *kratosZap.Logger {
 		}
 	}
 
+	var encoder zapcore.Encoder
+	if conf.EnCoder == "console" {
+		encoder = zapcore.NewConsoleEncoder(encoderConfig)
+	} else {
+		encoder = zapcore.NewJSONEncoder(encoderConfig)
+	}
 	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(encoderConfig),  // 编码器配置
+		encoder,                                // 编码器配置
 		zapcore.NewMultiWriteSyncer(output...), // 输出方式
 		zapcore.Level(conf.Level),              // 设置日志级别
 	)
 
-	return kratosZap.NewLogger(zap.New(core))
+	// 添加回调
+	var zapOptions []zap.Option
+	if conf.Caller {
+		callerSkip := 3
+		if conf.CallerSkip != nil {
+			callerSkip = *conf.CallerSkip
+		}
+		zapOptions = append(zapOptions, zap.AddCaller())
+		zapOptions = append(zapOptions, zap.AddCallerSkip(callerSkip))
+	}
+
+	return zap.New(core, zapOptions...)
 }

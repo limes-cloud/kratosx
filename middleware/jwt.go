@@ -11,6 +11,7 @@ import (
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/go-kratos/kratos/v2/transport/http"
 	jwtv4 "github.com/golang-jwt/jwt/v4"
+
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/jwt"
 )
@@ -49,8 +50,7 @@ func JwtBlack(conf *config.JWT) middleware.Middleware {
 		return nil
 	}
 	return func(handler middleware.Handler) middleware.Handler {
-		return func(ctx context.Context, req interface{}) (interface{}, error) {
-
+		return func(ctx context.Context, req any) (any, error) {
 			header, ok := transport.FromServerContext(ctx)
 			if !ok {
 				return handler(ctx, req)
@@ -73,5 +73,4 @@ func JwtBlack(conf *config.JWT) middleware.Middleware {
 			return handler(ctx, req)
 		}
 	}
-
 }
