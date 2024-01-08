@@ -136,6 +136,8 @@ type JWT struct {
 	Redis     string
 	Header    string
 	Secret    string
+	Unique    bool
+	UniqueKey string
 	Expire    time.Duration
 	Renewal   time.Duration
 	Whitelist map[string]bool

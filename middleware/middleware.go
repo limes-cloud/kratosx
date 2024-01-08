@@ -5,6 +5,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/metadata"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/middleware/validate"
+
 	"github.com/limes-cloud/kratosx/config"
 )
 
@@ -22,7 +23,9 @@ func New(conf config.Config) []middleware.Middleware {
 		IP(),
 		Jwt(app.JWT),
 		JwtBlack(app.JWT),
+		JwtUnique(app.JWT),
 		Authentication(app.Authentication),
+
 		metadata.Server(),
 	}
 	// 原地删除不启用的中间件

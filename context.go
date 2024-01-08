@@ -28,6 +28,7 @@ type Context interface {
 	Env() string
 	Logger() *log.Helper
 	DB(name ...string) *gorm.DB
+	Redis(name ...string) *redis.Client
 	Go(runner pool.Runner) error
 	Loader(name string) []byte
 	Email() email.Email

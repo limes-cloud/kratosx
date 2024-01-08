@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"sync"
 	"time"
@@ -26,6 +27,7 @@ type Jwt interface {
 	GetToken(ctx context.Context) string
 	SetToken(ctx context.Context, token string) context.Context
 	Renewal(ctx context.Context) (string, error)
+	CompareUniqueToken(key, token string) bool
 }
 
 type jwt struct {
@@ -39,7 +41,8 @@ var (
 )
 
 const (
-	blackPrefix = "token_black"
+	blackPrefix  = "token_black"
+	uniquePrefix = "token_unique"
 )
 
 // Instance 获取email对象实例
@@ -80,14 +83,25 @@ func (j *jwt) NewToken(m map[string]any) (string, error) {
 		return []byte(j.conf.Secret), nil
 	}
 
-	token := jwtv4.NewWithClaims(jwtv4.SigningMethodHS256, jwtv4.MapClaims(m))
-
-	key, err := keyFunc(token)
+	jwtToken := jwtv4.NewWithClaims(jwtv4.SigningMethodHS256, jwtv4.MapClaims(m))
+	key, err := keyFunc(jwtToken)
 	if err != nil {
 		return "", err
 	}
 
-	return token.SignedString(key)
+	token, err := jwtToken.SignedString(key)
+	if err != nil {
+		return "", err
+	}
+
+	if j.conf.Unique {
+		uniqueKey, ok := m[j.conf.UniqueKey]
+		if ok {
+			j.setUnique(fmt.Sprint(uniqueKey), token)
+		}
+	}
+
+	return token, nil
 }
 
 func (j *jwt) Parse(ctx context.Context, dst any) error {
@@ -195,7 +209,16 @@ func (j *jwt) IsBlacklist(token string) bool {
 
 func (j *jwt) AddBlacklist(token string) {
 	rd := redis.Instance().Get(j.conf.Redis)
-	if rd != nil {
-		rd.HSet(context.Background(), blackPrefix, token, 1, j.conf.Expire)
-	}
+	rd.HSet(context.Background(), blackPrefix, token, 1, j.conf.Expire)
+}
+
+func (j *jwt) setUnique(key, token string) {
+	rd := redis.Instance().Get(j.conf.Redis)
+	rd.HSet(context.Background(), uniquePrefix, key, token, j.conf.Expire)
+}
+
+func (j *jwt) CompareUniqueToken(key, token string) bool {
+	rd := redis.Instance().Get(j.conf.Redis)
+	res, _ := rd.HGet(context.Background(), uniquePrefix, key).Result()
+	return res == token
 }

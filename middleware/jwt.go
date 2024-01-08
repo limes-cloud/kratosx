@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/errors"
@@ -16,6 +17,7 @@ import (
 	"github.com/limes-cloud/kratosx/library/jwt"
 )
 
+// Jwt jwt验证
 func Jwt(conf *config.JWT) middleware.Middleware {
 	if conf == nil {
 		return nil
@@ -45,6 +47,7 @@ func Jwt(conf *config.JWT) middleware.Middleware {
 	}).Build()
 }
 
+// JwtBlack jwt黑名单
 func JwtBlack(conf *config.JWT) middleware.Middleware {
 	if conf == nil {
 		return nil
@@ -70,6 +73,36 @@ func JwtBlack(conf *config.JWT) middleware.Middleware {
 			}
 
 			ctx = jwtIns.SetToken(ctx, token)
+			return handler(ctx, req)
+		}
+	}
+}
+
+// JwtUnique jwt唯一校验
+func JwtUnique(conf *config.JWT) middleware.Middleware {
+	if conf == nil || !conf.Unique {
+		return nil
+	}
+	return func(handler middleware.Handler) middleware.Handler {
+		return func(ctx context.Context, req any) (any, error) {
+			claims, ok := kratosJwt.FromContext(ctx)
+			if !ok {
+				return handler(ctx, req)
+			}
+
+			mapClaims, ok := claims.(jwtv4.MapClaims)
+			if !ok {
+				return handler(ctx, req)
+			}
+
+			// 获取uniqueKey
+			jwtIns := jwt.Instance()
+			uk := fmt.Sprint(mapClaims[conf.UniqueKey])
+
+			// 对比token
+			if !jwtIns.CompareUniqueToken(uk, jwtIns.GetToken(ctx)) {
+				return nil, errors.Unauthorized("NOT_UNIQUE", "jwt is lose efficacy")
+			}
 			return handler(ctx, req)
 		}
 	}
