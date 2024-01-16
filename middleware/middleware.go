@@ -19,6 +19,7 @@ func New(conf config.Config) []middleware.Middleware {
 		Tracer(app.Name, app.Tracing),
 		Logging(app.Logging),
 		validate.Validator(),
+		Signature(app.Signature),
 
 		IP(),
 		Jwt(app.JWT),
