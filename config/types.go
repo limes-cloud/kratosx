@@ -13,6 +13,7 @@ type App struct {
 		Http *HttpService
 		Grpc *GrpcService
 	}
+	Signature      *Signature
 	Log            *Logger
 	Pool           *Pool
 	Email          *Email
@@ -189,4 +190,12 @@ type Marshal struct {
 	ForceUseJson    bool
 	EmitUnpopulated bool
 	UseProtoNames   bool
+}
+
+type Signature struct {
+	Enable    bool
+	Ak        string
+	Sk        string
+	Whitelist map[string]bool
+	Time      time.Duration
 }
