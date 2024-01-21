@@ -139,6 +139,7 @@ type JWT struct {
 	Secret    string
 	Unique    bool
 	UniqueKey string
+	Prefix    string
 	Expire    time.Duration
 	Renewal   time.Duration
 	Whitelist map[string]bool

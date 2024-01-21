@@ -28,15 +28,17 @@ func Jwt(conf *config.JWT) middleware.Middleware {
 	}
 
 	whitelist := func(ctx context.Context) bool {
+		jwtIns := jwt.Instance()
 		operation, path := "", ""
 		if tr, ok := transport.FromServerContext(ctx); ok {
 			operation = tr.Operation()
 		}
 		if h, is := http.RequestFromServerContext(ctx); is {
+			if jwtIns.IsPrefix(h.URL.Path) {
+				return true
+			}
 			path = h.Method + ":" + h.URL.Path
 		}
-
-		jwtIns := jwt.Instance()
 		return jwtIns.IsWhitelist(operation) || jwtIns.IsWhitelist(path)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ type Jwt interface {
 	Parse(ctx context.Context, dst any) error
 	ParseMapClaims(ctx context.Context) (map[string]any, error)
 	IsWhitelist(path string) bool
+	IsPrefix(path string) bool
 	IsBlacklist(token string) bool
 	AddBlacklist(token string)
 	GetToken(ctx context.Context) string
@@ -172,6 +174,13 @@ func (j *jwt) Renewal(ctx context.Context) (string, error) {
 	}
 
 	return j.NewToken(claims)
+}
+
+func (j *jwt) IsPrefix(path string) bool {
+	if j.conf.Prefix == "" {
+		return false
+	}
+	return strings.HasPrefix(path, j.conf.Prefix)
 }
 
 func (j *jwt) IsWhitelist(path string) bool {
