@@ -11,12 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mojocn/base64Captcha"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/email"
 	"github.com/limes-cloud/kratosx/library/redis"
-	"github.com/mojocn/base64Captcha"
 )
 
 type Captcha interface {
@@ -31,11 +32,13 @@ type captcha struct {
 	set map[string]*config.Captcha
 }
 
+type Sender func(conf *config.Captcha, answer string, expire time.Duration) (string, error)
+
 var instance *captcha
 
 const (
-	imageType = "imageType"
-	emailType = "emailType"
+	imageType = "image"
+	emailType = "email"
 )
 
 func Instance() Captcha {
@@ -73,98 +76,98 @@ func (c *captcha) initFactory(name string, conf *config.Captcha) {
 }
 
 func (c *captcha) Image(tp string, ip string) (Response, error) {
+	// 发送邮件
+	sender := func(conf *config.Captcha, answer string, expire time.Duration) (string, error) {
+		// 生成验证码对应图片的base64
+		dt := base64Captcha.NewDriverDigit(conf.Height, conf.Width, conf.Length, conf.Skew, conf.DotCount)
+		item, err := dt.DrawCaptcha(answer)
+		if err != nil {
+			return "", err
+		}
+		return item.EncodeB64string(), err
+	}
+
+	return c.factory(tp, ip, sender)
+}
+
+func (c *captcha) Email(tp string, ip string, to string) (Response, error) {
+	// 发送邮件
+	sender := func(conf *config.Captcha, answer string, expire time.Duration) (string, error) {
+		err := email.Instance().Template(conf.Template).Send(to, "", map[string]any{
+			"captcha": answer,
+			"minute":  int(conf.Expire.Minutes()),
+		})
+		return "", err
+	}
+
+	return c.factory(tp, ip, sender)
+}
+
+func (c *captcha) factory(tp string, ip string, sender Sender) (Response, error) {
 	conf, is := c.set[tp]
 	if !is {
 		return nil, errors.New(fmt.Sprintf("%s captcha not exist", tp))
 	}
 
+	// 获取验证码存储器
+	cache := redis.Instance().Get(conf.Redis)
+	if cache == nil {
+		return nil, fmt.Errorf("redis %v not exist", conf.Redis)
+	}
+
 	// 生成随机验证码
 	answer := c.randomCode(conf.Length)
 
-	// 生成验证码对应图片的base64
-	dt := base64Captcha.NewDriverDigit(conf.Height, conf.Width, conf.Length, conf.Skew, conf.DotCount)
-	item, err := dt.DrawCaptcha(answer)
+	// 获取当前用户的场景唯一id
+	clientKey := c.uid(tp, ip, emailType)
+
+	countKey := fmt.Sprintf("%s_count", clientKey)
+
+	// 判断ip是否限制次数
+	if conf.IpLimit != 0 {
+		if count, _ := cache.Get(context.Background(), countKey).Int(); count > conf.IpLimit {
+			return nil, errors.New("当前IP已超过最大验证次数")
+		}
+	}
+
+	// 清除上一次生成的结果,防止同时造成大量生成请求占用内存
+	if uid, _ := cache.Get(context.Background(), clientKey).Result(); uid != "" {
+		if !conf.Refresh {
+			return nil, errors.New("请勿重复请求验证码")
+		}
+		cache.Del(context.Background(), uid)
+	}
+
+	// 获取当前验证码验证码唯一id
+	uid := uuid.New().String()
+	if err := cache.Set(context.Background(), uid, answer, conf.Expire).Err(); err != nil {
+		return nil, err
+	}
+
+	// 将本次验证码挂载到当前的场景id上
+	if err := cache.Set(context.Background(), clientKey, uid, conf.Expire).Err(); err != nil {
+		return nil, err
+	}
+
+	// 执行发送器
+	base64, err := sender(conf, answer, conf.Expire)
 	if err != nil {
 		return nil, err
 	}
 
-	// 获取验证码存储器
-	cache := redis.Instance().Get(conf.Redis)
-	if cache == nil {
-		return nil, fmt.Errorf("redis %v not exist", conf.Redis)
-	}
-
-	// 获取当前用户的场景唯一id
-	redisKey := c.uid(tp, ip, imageType)
-
-	// 清除上一次生成的结果,防止同时造成大量生成请求占用内存
-	if uid, _ := cache.Get(context.Background(), redisKey).Result(); uid != "" {
-		cache.Del(context.Background(), uid)
-	}
-
-	// 获取当前验证码验证码唯一id
-	uid := uuid.New().String()
-	if err = cache.Set(context.Background(), uid, answer, conf.Expire+time.Second).Err(); err != nil {
-		return nil, err
-	}
-
-	// 将本次验证码挂载到当前的场景id上
-	if err = cache.Set(context.Background(), redisKey, uid, conf.Expire+time.Second).Err(); err != nil {
-		return nil, err
+	// 存储发送次数
+	if conf.IpLimit != 0 && cache.Incr(context.Background(), countKey).Val() == 1 {
+		// 设置当天00:00过期
+		timeStr := time.Now().Format("2006-01-02")
+		t, _ := time.ParseInLocation("2006-01-02", timeStr, time.Local)
+		cache.ExpireAt(context.Background(), countKey, t.Add(86400*time.Second))
 	}
 
 	// 返回生成结果
 	return &response{
 		id:     uid,
-		base64: item.EncodeB64string(),
 		expire: conf.Expire,
-	}, nil
-}
-
-func (c *captcha) Email(tp string, ip string, to string) (Response, error) {
-	conf, is := c.set[tp]
-	if !is {
-		return nil, errors.New(fmt.Sprintf("%s captcha not exist", tp))
-	}
-
-	// 获取验证码存储器
-	cache := redis.Instance().Get(conf.Redis)
-	if cache == nil {
-		return nil, fmt.Errorf("redis %v not exist", conf.Redis)
-	}
-
-	// 生成随机验证码
-	answer := c.randomCode(conf.Length)
-
-	// 获取当前用户的场景唯一id
-	redisKey := c.uid(tp, ip, emailType)
-
-	// 清除上一次生成的结果,防止同时造成大量生成请求占用内存
-	if uid, _ := cache.Get(context.Background(), redisKey).Result(); uid != "" {
-		cache.Del(context.Background(), uid)
-	}
-
-	// 获取当前验证码验证码唯一id
-	uid := uuid.New().String()
-	if err := cache.Set(context.Background(), uid, answer, conf.Expire+time.Second).Err(); err != nil {
-		return nil, err
-	}
-
-	// 将本次验证码挂载到当前的场景id上
-	if err := cache.Set(context.Background(), redisKey, uid, conf.Expire+time.Second).Err(); err != nil {
-		return nil, err
-	}
-
-	if err := email.Instance().Template(conf.Template).Send(to, "", map[string]any{
-		"answer": answer,
-		"minute": int(conf.Expire.Minutes()),
-	}); err != nil {
-		return nil, err
-	}
-	// 返回生成结果
-	return &response{
-		id:     uid,
-		expire: conf.Expire,
+		base64: base64,
 	}, nil
 }
 

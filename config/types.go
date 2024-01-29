@@ -125,6 +125,8 @@ type Captcha struct {
 	Width    int
 	Skew     float64
 	DotCount int
+	Refresh  bool
+	IpLimit  int
 	Template string
 }
 
