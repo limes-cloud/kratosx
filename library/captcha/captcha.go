@@ -87,7 +87,7 @@ func (c *captcha) Image(tp string, ip string) (Response, error) {
 		return item.EncodeB64string(), err
 	}
 
-	return c.factory(tp, ip, sender)
+	return c.generate(tp, ip, imageType, sender)
 }
 
 func (c *captcha) Email(tp string, ip string, to string) (Response, error) {
@@ -100,10 +100,10 @@ func (c *captcha) Email(tp string, ip string, to string) (Response, error) {
 		return "", err
 	}
 
-	return c.factory(tp, ip, sender)
+	return c.generate(tp, ip, emailType, sender)
 }
 
-func (c *captcha) factory(tp string, ip string, sender Sender) (Response, error) {
+func (c *captcha) generate(tp, ip, tpe string, sender Sender) (Response, error) {
 	conf, is := c.set[tp]
 	if !is {
 		return nil, errors.New(fmt.Sprintf("%s captcha not exist", tp))
@@ -119,7 +119,7 @@ func (c *captcha) factory(tp string, ip string, sender Sender) (Response, error)
 	answer := c.randomCode(conf.Length)
 
 	// 获取当前用户的场景唯一id
-	clientKey := c.uid(tp, ip, emailType)
+	clientKey := c.uid(tp, ip, tpe)
 
 	countKey := fmt.Sprintf("%s_count", clientKey)
 
