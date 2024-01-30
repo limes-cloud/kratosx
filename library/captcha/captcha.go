@@ -138,6 +138,12 @@ func (c *captcha) factory(tp string, ip string, sender Sender) (Response, error)
 		cache.Del(context.Background(), uid)
 	}
 
+	// 执行发送器
+	base64, err := sender(conf, answer, conf.Expire)
+	if err != nil {
+		return nil, err
+	}
+
 	// 获取当前验证码验证码唯一id
 	uid := uuid.New().String()
 	if err := cache.Set(context.Background(), uid, answer, conf.Expire).Err(); err != nil {
@@ -146,12 +152,6 @@ func (c *captcha) factory(tp string, ip string, sender Sender) (Response, error)
 
 	// 将本次验证码挂载到当前的场景id上
 	if err := cache.Set(context.Background(), clientKey, uid, conf.Expire).Err(); err != nil {
-		return nil, err
-	}
-
-	// 执行发送器
-	base64, err := sender(conf, answer, conf.Expire)
-	if err != nil {
 		return nil, err
 	}
 
