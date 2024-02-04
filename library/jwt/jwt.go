@@ -126,22 +126,7 @@ func (j *jwt) Parse(ctx context.Context, dst any) error {
 func (j *jwt) ParseMapClaims(ctx context.Context) (map[string]any, error) {
 	tokenInfo, is := kratosJwt.FromContext(ctx)
 	if !is {
-		token := j.GetToken(ctx)
-		if token == "" {
-			return nil, errors.New("token miss")
-		}
-
-		jt, _ := jwtv4.Parse(token, func(token *jwtv4.Token) (any, error) {
-			return []byte(j.conf.Secret), nil
-		})
-		if jt == nil || jt.Claims == nil {
-			return nil, errors.New("token parse error")
-		}
-
-		tokenInfo, is = jt.Claims.(jwtv4.MapClaims)
-		if !is {
-			return nil, errors.New("token format error")
-		}
+		return nil, errors.New("token miss")
 	}
 	claims, is := tokenInfo.(jwtv4.MapClaims)
 	if !is {

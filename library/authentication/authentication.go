@@ -2,7 +2,10 @@ package authentication
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/casbin/casbin/v2/model"
 	adapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/metadata"
 	"github.com/go-redis/redis/v8"
 
 	"github.com/limes-cloud/kratosx/config"
@@ -27,6 +31,8 @@ type Authentication interface {
 	GetRole(ctx context.Context) (string, error)
 	Enforce() *casbin.Enforcer
 	IsSkipRole(role string) bool
+	SetAuth(req *http.Request, data string)
+	ParseAuth(req context.Context, dst any) error
 }
 
 type authentication struct {
@@ -40,7 +46,10 @@ type authentication struct {
 
 var instance *authentication
 
-const redisKey = "rbac_authentication"
+const (
+	redisKey  = "rbac_authentication"
+	authMdKey = "x-md-auth"
+)
 
 func Instance() Authentication {
 	return instance
@@ -145,6 +154,24 @@ func (a *authentication) initSkipRole(skips []string) {
 	for _, role := range skips {
 		a.skipRole[role] = struct{}{}
 	}
+}
+
+func (a *authentication) SetAuth(req *http.Request, data string) {
+	if data == "" {
+		return
+	}
+	req.Header.Set(authMdKey, data)
+}
+
+func (a *authentication) ParseAuth(ctx context.Context, dst any) error {
+	if md, ok := metadata.FromServerContext(ctx); ok {
+		body := md.Get(authMdKey)
+		if err := json.Unmarshal([]byte(body), dst); err != nil {
+			return errors.New("auth info format error:" + err.Error())
+		}
+		return nil
+	}
+	return errors.New("not exist auth info")
 }
 
 func (a *authentication) IsSkipRole(role string) bool {
