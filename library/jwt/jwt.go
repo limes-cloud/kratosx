@@ -107,11 +107,11 @@ func (j *jwt) NewToken(m map[string]any) (string, error) {
 }
 
 func (j *jwt) Parse(ctx context.Context, dst any) error {
-	token, is := kratosJwt.FromContext(ctx)
+	tokenInfo, is := kratosJwt.FromContext(ctx)
 	if !is {
 		return errors.New("token miss")
 	}
-	claims, is := token.(jwtv4.MapClaims)
+	claims, is := tokenInfo.(jwtv4.MapClaims)
 	if !is {
 		return errors.New("token format error")
 	}
@@ -124,11 +124,26 @@ func (j *jwt) Parse(ctx context.Context, dst any) error {
 }
 
 func (j *jwt) ParseMapClaims(ctx context.Context) (map[string]any, error) {
-	token, is := kratosJwt.FromContext(ctx)
+	tokenInfo, is := kratosJwt.FromContext(ctx)
 	if !is {
-		return nil, errors.New("token miss")
+		token := j.GetToken(ctx)
+		if token == "" {
+			return nil, errors.New("token miss")
+		}
+
+		jt, _ := jwtv4.Parse(token, func(token *jwtv4.Token) (any, error) {
+			return []byte(j.conf.Secret), nil
+		})
+		if jt == nil || jt.Claims == nil {
+			return nil, errors.New("token parse error")
+		}
+
+		tokenInfo, is = jt.Claims.(jwtv4.MapClaims)
+		if !is {
+			return nil, errors.New("token format error")
+		}
 	}
-	claims, is := token.(jwtv4.MapClaims)
+	claims, is := tokenInfo.(jwtv4.MapClaims)
 	if !is {
 		return nil, errors.New("token format error")
 	}

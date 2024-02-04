@@ -2,10 +2,12 @@ package middleware
 
 import (
 	"context"
+
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/go-kratos/kratos/v2/transport/http"
+
 	ec "github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/authentication"
 )
@@ -35,6 +37,10 @@ func Authentication(conf *ec.Authentication) middleware.Middleware {
 				method = h.Method
 			} else {
 				method = "GRPC"
+			}
+
+			if author.IsWhitelist(path, method) {
+				return handler(ctx, req)
 			}
 
 			role, er := author.GetRole(ctx)
