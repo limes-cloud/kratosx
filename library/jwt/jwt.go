@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,8 +21,7 @@ type Jwt interface {
 	NewToken(m map[string]any) (string, error)
 	Parse(ctx context.Context, dst any) error
 	ParseMapClaims(ctx context.Context) (map[string]any, error)
-	IsWhitelist(path string) bool
-	IsPrefix(path string) bool
+	IsWhitelist(path, method string) bool
 	IsBlacklist(token string) bool
 	AddBlacklist(token string)
 	GetToken(ctx context.Context) string
@@ -176,17 +174,19 @@ func (j *jwt) Renewal(ctx context.Context) (string, error) {
 	return j.NewToken(claims)
 }
 
-func (j *jwt) IsPrefix(path string) bool {
-	if j.conf.Prefix == "" {
-		return false
-	}
-	return strings.HasPrefix(path, j.conf.Prefix)
+func (a *jwt) path(path, method string) string {
+	return fmt.Sprintf("%s:%s", path, method)
 }
 
-func (j *jwt) IsWhitelist(path string) bool {
+func (j *jwt) IsWhitelist(path, method string) bool {
 	j.rw.RLock()
 	defer j.rw.RUnlock()
 
+	if !j.conf.EnableGrpc && method == "GRPC" {
+		return true
+	}
+
+	path = j.path(path, method)
 	if j.conf.Whitelist[path] {
 		return true
 	}

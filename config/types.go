@@ -136,24 +136,25 @@ type Logging struct {
 }
 
 type JWT struct {
-	Redis     string
-	Header    string
-	Secret    string
-	Unique    bool
-	UniqueKey string
-	Prefix    string
-	Expire    time.Duration
-	Renewal   time.Duration
-	Whitelist map[string]bool
+	EnableGrpc bool
+	Redis      string
+	Header     string
+	Secret     string
+	Unique     bool
+	UniqueKey  string
+	Expire     time.Duration
+	Renewal    time.Duration
+	Whitelist  map[string]bool
 }
 
 type Authentication struct {
-	DB        string
-	Prefix    string
-	Redis     string
-	RoleKey   string
-	Whitelist map[string]bool
-	SkipRole  []string
+	EnableGrpc bool
+	DB         string
+	Prefix     string
+	Redis      string
+	RoleKey    string
+	Whitelist  map[string]bool
+	SkipRole   []string
 }
 
 type Logger struct {

@@ -29,17 +29,19 @@ func Jwt(conf *config.JWT) middleware.Middleware {
 
 	whitelist := func(ctx context.Context) bool {
 		jwtIns := jwt.Instance()
-		operation, path := "", ""
+		path, method := "", ""
+
 		if tr, ok := transport.FromServerContext(ctx); ok {
-			operation = tr.Operation()
+			path = tr.Operation()
 		}
-		if h, is := http.RequestFromServerContext(ctx); is {
-			if jwtIns.IsPrefix(h.URL.Path) {
-				return true
-			}
-			path = h.Method + ":" + h.URL.Path
+		h, is := http.RequestFromServerContext(ctx)
+		if is {
+			path = h.URL.Path
+			method = h.Method
+		} else {
+			method = "GRPC"
 		}
-		return jwtIns.IsWhitelist(operation) || jwtIns.IsWhitelist(path)
+		return jwtIns.IsWhitelist(path, method) || jwtIns.IsWhitelist(path, method)
 	}
 
 	return selector.Server(

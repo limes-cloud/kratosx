@@ -36,12 +36,12 @@ type Authentication interface {
 }
 
 type authentication struct {
+	conf     *config.Authentication
 	enforcer *casbin.Enforcer
 	redis    *redis.Client
 	roleKey  string
 	skipRole map[string]struct{}
 	mutex    sync.RWMutex
-	prefix   string
 }
 
 var instance *authentication
@@ -109,7 +109,7 @@ func Init(conf *config.Authentication, watcher config.Watcher) {
 		redis:    rdi,
 		roleKey:  conf.RoleKey,
 		skipRole: make(map[string]struct{}),
-		prefix:   conf.Prefix,
+		conf:     conf,
 	}
 	instance.initSkipRole(conf.SkipRole)
 	instance.initWhitelist(conf.Whitelist)
@@ -183,7 +183,7 @@ func (a *authentication) IsSkipRole(role string) bool {
 }
 
 func (a *authentication) path(path, method string) string {
-	return fmt.Sprintf("%s:%s", a.prefix+path, method)
+	return fmt.Sprintf("%s:%s", path, method)
 }
 
 func (a *authentication) AddWhitelist(path string, method string) {
@@ -195,6 +195,9 @@ func (a *authentication) RemoveWhitelist(path, method string) {
 }
 
 func (a *authentication) IsWhitelist(path, method string) bool {
+	if !a.conf.EnableGrpc && method == "GRPC" {
+		return true
+	}
 	is, _ := a.redis.HGet(context.Background(), redisKey, a.path(path, method)).Bool()
 	return is
 }
@@ -205,7 +208,7 @@ func (a *authentication) Auth(role, path, method string) bool {
 	}
 
 	// 进行鉴权
-	is, _ := a.enforcer.Enforce(role, a.prefix+path, method)
+	is, _ := a.enforcer.Enforce(role, path, method)
 	return is
 }
 
