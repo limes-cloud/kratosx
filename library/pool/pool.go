@@ -2,12 +2,13 @@ package pool
 
 import (
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/limes-cloud/kratosx/config"
 	"github.com/panjf2000/ants/v2"
+
+	"github.com/limes-cloud/kratosx/config"
 )
 
 type Runner interface {
-	Run()
+	Run() error
 }
 
 type Pool interface {
@@ -18,10 +19,10 @@ type pool struct {
 	pf *ants.PoolWithFunc
 }
 
-var instance *pool
+var ins *pool
 
 func Instance() Pool {
-	return instance
+	return ins
 }
 
 func Init(conf *config.Pool, watcher config.Watcher) {
@@ -43,7 +44,7 @@ func Init(conf *config.Pool, watcher config.Watcher) {
 		panic("协程池初始化失败：" + err.Error())
 	}
 
-	instance = &pool{pf: p}
+	ins = &pool{pf: p}
 
 	watcher("pool.size", func(value config.Value) {
 		size, err := value.Int()
@@ -52,11 +53,23 @@ func Init(conf *config.Pool, watcher config.Watcher) {
 			return
 		}
 		if size != 0 {
-			instance.pf.Tune(int(size))
+			ins.pf.Tune(int(size))
 		}
 	})
 }
 
 func (c *pool) Go(runner Runner) error {
 	return c.pf.Invoke(runner)
+}
+
+type runner struct {
+	fn func() error
+}
+
+func (r runner) Run() error {
+	return r.fn()
+}
+
+func AddRunner(fn func() error) Runner {
+	return &runner{fn: fn}
 }

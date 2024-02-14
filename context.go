@@ -40,6 +40,7 @@ type Context interface {
 	Ctx() context.Context
 	GetMetadata(string) string
 	SetMetadata(key, value string)
+	WaitRunner() pool.WaitRunner
 
 	ID() string
 	Name() string
@@ -91,6 +92,11 @@ func (c *ctx) Redis(name ...string) *redis.Client {
 // Go 获取并发池实例
 func (c *ctx) Go(runner pool.Runner) error {
 	return pool.Instance().Go(runner)
+}
+
+// WaitRunner 获取并发池等待实例
+func (c *ctx) WaitRunner() pool.WaitRunner {
+	return pool.NewWaitRunner()
 }
 
 // Loader 获加载器实例
