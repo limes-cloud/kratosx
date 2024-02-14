@@ -186,7 +186,7 @@ func (j *jwt) IsWhitelist(path, method string) bool {
 		return true
 	}
 
-	path = j.path(path, method)
+	path = j.path(method, path)
 	if j.conf.Whitelist[path] {
 		return true
 	}
@@ -194,7 +194,7 @@ func (j *jwt) IsWhitelist(path, method string) bool {
 	for p := range j.conf.Whitelist {
 		// 将*替换为匹配任意多字符的正则表达式
 		pattern := "^" + p + "$"
-		pattern = regexp.MustCompile(`/\*`).ReplaceAllString(pattern, "/.+")
+		pattern = regexp.MustCompile(`\*`).ReplaceAllString(pattern, ".+")
 
 		// 编译正则表达式
 		re := regexp.MustCompile(pattern)
