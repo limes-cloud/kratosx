@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -12,6 +11,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	jwtv4 "github.com/golang-jwt/jwt/v4"
+	json "github.com/json-iterator/go"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/redis"
@@ -105,15 +105,10 @@ func (j *jwt) NewToken(m map[string]any) (string, error) {
 }
 
 func (j *jwt) Parse(ctx context.Context, dst any) error {
-	tokenInfo, is := kratosJwt.FromContext(ctx)
-	if !is {
-		return errors.New("token miss")
+	claims, err := j.ParseMapClaims(ctx)
+	if err != nil {
+		return err
 	}
-	claims, is := tokenInfo.(jwtv4.MapClaims)
-	if !is {
-		return errors.New("token format error")
-	}
-
 	body, err := json.Marshal(claims)
 	if err != nil {
 		return err
@@ -124,11 +119,29 @@ func (j *jwt) Parse(ctx context.Context, dst any) error {
 func (j *jwt) ParseMapClaims(ctx context.Context) (map[string]any, error) {
 	tokenInfo, is := kratosJwt.FromContext(ctx)
 	if !is {
-		return nil, errors.New("token miss")
+		if j == nil {
+			return nil, kratosJwt.ErrMissingJwtToken
+		}
+		token := j.GetToken(ctx)
+		if token == "" {
+			return nil, kratosJwt.ErrMissingJwtToken
+		}
+
+		parser, _ := jwtv4.Parse(token, func(token *jwtv4.Token) (any, error) {
+			return []byte(j.conf.Secret), nil
+		})
+		if parser == nil || parser.Claims == nil {
+			return nil, kratosJwt.ErrTokenInvalid
+		}
+
+		tokenInfo, is = parser.Claims.(jwtv4.MapClaims)
+		if !is {
+			return nil, kratosJwt.ErrTokenParseFail
+		}
 	}
 	claims, is := tokenInfo.(jwtv4.MapClaims)
 	if !is {
-		return nil, errors.New("token format error")
+		return nil, kratosJwt.ErrTokenParseFail
 	}
 	return claims, nil
 }

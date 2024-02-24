@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/middleware"
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	"github.com/go-kratos/kratos/v2/middleware/selector"
@@ -73,7 +72,7 @@ func JwtBlack(conf *config.JWT) middleware.Middleware {
 			// 判断token是否在黑名单内
 			jwtIns := jwt.Instance()
 			if jwtIns.IsBlacklist(token) {
-				return nil, errors.Unauthorized("UNAUTHORIZED", "JWT token is lose efficacy")
+				return nil, kratosJwt.ErrTokenInvalid
 			}
 
 			ctx = jwtIns.SetToken(ctx, token)
@@ -105,7 +104,7 @@ func JwtUnique(conf *config.JWT) middleware.Middleware {
 
 			// 对比token
 			if !jwtIns.CompareUniqueToken(uk, jwtIns.GetToken(ctx)) {
-				return nil, errors.Unauthorized("NOT_UNIQUE", "jwt is lose efficacy")
+				return nil, kratosJwt.ErrTokenInvalid
 			}
 			return handler(ctx, req)
 		}

@@ -15,11 +15,12 @@ import (
 	adapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/metadata"
+	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	"github.com/go-redis/redis/v8"
+	jwtv4 "github.com/golang-jwt/jwt/v4"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/db"
-	"github.com/limes-cloud/kratosx/library/jwt"
 	rd "github.com/limes-cloud/kratosx/library/redis"
 )
 
@@ -213,9 +214,13 @@ func (a *authentication) Auth(role, path, method string) bool {
 }
 
 func (a *authentication) GetRole(ctx context.Context) (string, error) {
-	claims, _ := jwt.Instance().ParseMapClaims(ctx)
-	if claims == nil {
+	tokenInfo, is := kratosJwt.FromContext(ctx)
+	if !is { // 跳过jwt白名单的也不检测
 		return "", nil
+	}
+	claims, is := tokenInfo.(jwtv4.MapClaims)
+	if !is {
+		return "", errors.New("token format error")
 	}
 
 	role, is := claims[a.roleKey].(string)

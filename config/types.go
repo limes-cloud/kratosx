@@ -18,6 +18,7 @@ type App struct {
 	Pool           *Pool
 	Email          *Email
 	JWT            *JWT
+	Http           *Http
 	Logging        *Logging
 	Authentication *Authentication
 	Tracing        *Tracing
@@ -202,4 +203,12 @@ type Signature struct {
 	Sk        string
 	Whitelist map[string]bool
 	Time      time.Duration
+}
+
+type Http struct {
+	EnableLog        bool
+	RetryCount       int
+	RetryWaitTime    time.Duration
+	MaxRetryWaitTime time.Duration
+	Timeout          time.Duration
 }

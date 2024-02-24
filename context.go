@@ -16,6 +16,7 @@ import (
 	"github.com/limes-cloud/kratosx/library/captcha"
 	"github.com/limes-cloud/kratosx/library/db"
 	"github.com/limes-cloud/kratosx/library/email"
+	"github.com/limes-cloud/kratosx/library/http"
 	"github.com/limes-cloud/kratosx/library/ip"
 	"github.com/limes-cloud/kratosx/library/jwt"
 	"github.com/limes-cloud/kratosx/library/loader"
@@ -41,6 +42,7 @@ type Context interface {
 	GetMetadata(string) string
 	SetMetadata(key, value string)
 	WaitRunner() pool.WaitRunner
+	Http() http.Request
 
 	ID() string
 	Name() string
@@ -76,6 +78,9 @@ func (c *ctx) Ctx() context.Context {
 
 // Logger 获取链路日志器
 func (c *ctx) Logger() *log.Helper {
+	if !c.Config().IsInit() {
+		return log.NewHelper(log.DefaultLogger)
+	}
 	return logger.Helper().WithContext(c.Context)
 }
 
@@ -122,6 +127,14 @@ func (c *ctx) ClientIP() string {
 // JWT 获取令牌验证器
 func (c *ctx) JWT() jwt.Jwt {
 	return jwt.Instance()
+}
+
+// Http 带链路日志的请求工具
+func (c *ctx) Http() http.Request {
+	if !c.Config().IsInit() || c.Config().App().Http == nil {
+		return http.NewDefault(c.Logger())
+	}
+	return http.New(c.Config().App().Http, c.Logger())
 }
 
 // Token 获取令牌验证器

@@ -67,6 +67,11 @@ func ToUint32(in string) uint32 {
 	return uint32(uint32Value)
 }
 
+func ToInt64(in string) int64 {
+	val, _ := strconv.ParseInt(in, 10, 64)
+	return val
+}
+
 func HexToByte(hex string) []byte {
 	length := len(hex) / 2
 	slice := make([]byte, length)

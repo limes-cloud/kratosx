@@ -19,6 +19,7 @@ type Config interface {
 	ScanWatch(key string, o WatchHandleFunc)
 	Close() error
 	App() *App
+	IsInit() bool
 }
 
 type config struct {
@@ -39,6 +40,10 @@ func New(source kratosConfig.Source) Config {
 		),
 	}
 	return instance
+}
+
+func (c *config) IsInit() bool {
+	return !(c == nil || c.ins == nil)
 }
 
 func (c *config) Load() error {
