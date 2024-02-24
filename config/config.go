@@ -8,13 +8,15 @@ import (
 )
 
 type WatchHandleFunc func(Value)
+
 type Watcher func(key string, o WatchHandleFunc)
 
 type Config interface {
 	Load() error
-	Scan(v interface{}) error
+	Scan(v any) error
 	Value(key string) Value
 	Watch(key string, o WatchHandleFunc)
+	ScanWatch(key string, o WatchHandleFunc)
 	Close() error
 	App() *App
 }
@@ -86,7 +88,17 @@ func (c *config) Value(key string) Value {
 	return c.transformValue(c.ins.Value(key))
 }
 
+func (c *config) ScanWatch(key string, handler WatchHandleFunc) {
+	handler(c.Value(key))
+	c.Watch(key, handler)
+}
+
 func (c *config) Watch(key string, handler WatchHandleFunc) {
+	defer func() {
+		if p := recover(); p != nil {
+			log.Error("监听配置失败：%v", p)
+		}
+	}()
 	if err := c.ins.Watch(key, func(_ string, value kratosConfig.Value) {
 		handler(c.transformValue(value))
 	}); err != nil {

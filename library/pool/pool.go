@@ -32,7 +32,9 @@ func Init(conf *config.Pool, watcher config.Watcher) {
 
 	p, err := ants.NewPoolWithFunc(conf.Size, func(i any) {
 		if run, ok := i.(Runner); ok {
-			run.Run()
+			if err := run.Run(); err != nil {
+				log.Errorf("协程任务执行失败：%s", err.Error())
+			}
 		}
 	},
 		ants.WithExpiryDuration(conf.ExpiryDuration),
