@@ -2,6 +2,7 @@ package util
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"regexp"
@@ -98,4 +99,11 @@ func PrintArtFont(str string) {
 
 	renderStr, _ := ascii.RenderOpts(str, options)
 	fmt.Println(renderStr)
+}
+
+func Sha256(in []byte) string {
+	m := sha256.New()
+	m.Write(in)
+	res := hex.EncodeToString(m.Sum(nil))
+	return res
 }
