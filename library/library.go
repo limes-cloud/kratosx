@@ -4,6 +4,7 @@ import (
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/authentication"
 	"github.com/limes-cloud/kratosx/library/captcha"
+	"github.com/limes-cloud/kratosx/library/client"
 	"github.com/limes-cloud/kratosx/library/db"
 	"github.com/limes-cloud/kratosx/library/email"
 	"github.com/limes-cloud/kratosx/library/jwt"
@@ -44,4 +45,7 @@ func Init(conf config.Config, fs logger.LogField) {
 
 	// authentication 鉴权器初始化
 	authentication.Init(conf.App().Authentication, conf.Watch)
+
+	// grpc 客户端初始化
+	client.Init(conf.App().Server.Registry, conf.App().Client, conf.Watch)
 }

@@ -2,6 +2,7 @@ package kratosx
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/go-kratos/kratos/v2"
@@ -9,11 +10,13 @@ import (
 	"github.com/go-kratos/kratos/v2/metadata"
 	md "github.com/go-kratos/kratos/v2/metadata"
 	"github.com/go-redis/redis/v8"
+	"google.golang.org/grpc"
 	"gorm.io/gorm"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/authentication"
 	"github.com/limes-cloud/kratosx/library/captcha"
+	"github.com/limes-cloud/kratosx/library/client"
 	"github.com/limes-cloud/kratosx/library/db"
 	"github.com/limes-cloud/kratosx/library/email"
 	"github.com/limes-cloud/kratosx/library/http"
@@ -43,6 +46,7 @@ type Context interface {
 	SetMetadata(key, value string)
 	WaitRunner() pool.WaitRunner
 	Http() http.Request
+	GrpcConn(srvName string) (*grpc.ClientConn, error)
 
 	ID() string
 	Name() string
@@ -163,6 +167,15 @@ func (c *ctx) SetMetadata(key, value string) {
 // Config 获取配置对象
 func (c *ctx) Config() config.Config {
 	return config.Instance()
+}
+
+// GrpcConn 获取grpc 连接具柄
+func (c *ctx) GrpcConn(srvName string) (*grpc.ClientConn, error) {
+	cli := client.Get(srvName)
+	if cli == nil {
+		return nil, errors.New("not exist server " + srvName)
+	}
+	return cli.Conn(c.Ctx())
 }
 
 // Env 获取配置环境

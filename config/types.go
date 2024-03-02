@@ -10,8 +10,10 @@ type App struct {
 	Version string
 	Env     string
 	Server  *struct {
-		Http *HttpService
-		Grpc *GrpcService
+		Count    int
+		Registry *string
+		Http     *HttpService
+		Grpc     *GrpcService
 	}
 	Signature      *Signature
 	Log            *Logger
@@ -22,6 +24,7 @@ type App struct {
 	Logging        *Logging
 	Authentication *Authentication
 	Tracing        *Tracing
+	Client         []*Client
 	Database       map[string]*Database
 	Redis          map[string]*Redis
 	Loader         map[string]string
@@ -32,6 +35,8 @@ type App struct {
 type GrpcService struct {
 	Network     string
 	Addr        string
+	Host        string
+	Port        int
 	MaxRecvSize int
 	Timeout     time.Duration
 }
@@ -39,6 +44,8 @@ type GrpcService struct {
 type HttpService struct {
 	Network        string
 	Addr           string
+	Host           string
+	Port           int
 	Timeout        time.Duration
 	FormatResponse bool
 	Cors           *Cors
@@ -211,4 +218,17 @@ type Http struct {
 	RetryWaitTime    time.Duration
 	MaxRetryWaitTime time.Duration
 	Timeout          time.Duration
+}
+
+type Client struct {
+	Server   string
+	Type     string
+	Timeout  time.Duration
+	Metadata map[string]string
+	Backends []Backend
+}
+
+type Backend struct {
+	Target string
+	Weight *int64
 }

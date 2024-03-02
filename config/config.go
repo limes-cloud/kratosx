@@ -12,6 +12,7 @@ type WatchHandleFunc func(Value)
 type Watcher func(key string, o WatchHandleFunc)
 
 type Config interface {
+	SetAppInfo(id, name, version string)
 	Load() error
 	Scan(v any) error
 	Value(key string) Value
@@ -113,4 +114,8 @@ func (c *config) Watch(key string, handler WatchHandleFunc) {
 
 func (c *config) Close() error {
 	return c.ins.Close()
+}
+
+func (c *config) SetAppInfo(id, name, version string) {
+	c.app.ID, c.app.Name, c.app.Version = id, name, version
 }
