@@ -4,13 +4,11 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
 	json "github.com/json-iterator/go"
-	"github.com/mbndr/figlet4go"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -83,22 +81,6 @@ func HexToByte(hex string) []byte {
 		slice[i] = byte(value & 0xFF)
 	}
 	return slice
-}
-
-func PrintArtFont(str string) {
-	ascii := figlet4go.NewAsciiRender()
-	options := figlet4go.NewRenderOptions()
-	hexColor, _ := figlet4go.NewTrueColorFromHexString("885DBA")
-	options.FontColor = []figlet4go.Color{
-		// Colors can be given by default ansi color codes...
-		figlet4go.ColorGreen,
-		figlet4go.ColorYellow,
-		figlet4go.ColorCyan,
-		hexColor,
-	}
-
-	renderStr, _ := ascii.RenderOpts(str, options)
-	fmt.Println(renderStr)
 }
 
 func Sha256(in []byte) string {

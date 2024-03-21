@@ -2,14 +2,15 @@ package lock
 
 import (
 	"context"
+	"errors"
+	"math/rand"
+	"time"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/go-redsync/redsync/v4"
-	goredis "github.com/go-redsync/redsync/v4/redis/goredis/v8"
+	"github.com/go-redsync/redsync/v4/redis/goredis/v8"
 	"github.com/google/uuid"
-	"time"
 )
-
-//https://cloud.tencent.com/developer/article/2334541
 
 type Option func(*option)
 
@@ -33,7 +34,7 @@ func WithValue(value string) Option {
 type Lock interface {
 	Acquire(ctx context.Context) error
 	Release(ctx context.Context) error
-	AcquireFunc(f func() error, do func() error) error
+	AcquireFunc(ctx context.Context, cf func() error, do func() error) error
 }
 
 type lock struct {
@@ -66,6 +67,31 @@ func (l *lock) Release(ctx context.Context) error {
 	return err
 }
 
-func (l *lock) AcquireFunc(f func() error, do func() error) error {
-	return nil
+func (l *lock) AcquireFunc(ctx context.Context, cf func() error, do func() error) error {
+	for {
+		// 获取数据，先查询，查询数据比插入数据qps更高，也防止锁变成串行化
+		if err := cf(); err == nil {
+			return nil
+		}
+
+		// 数据不存在则去拿锁
+		if err := l.mux.TryLockContext(ctx); err == nil {
+			break
+		} else if !errors.Is(err, redsync.ErrFailed) {
+			return err
+		}
+
+		// 防止频繁自旋[5-30ms]
+		time.Sleep(time.Duration(5+rand.Intn(25)) * time.Millisecond)
+	}
+
+	// 查询缓存数据，防止获取锁之后，存在
+	if err := cf(); err == nil {
+		return nil
+	}
+
+	return func() error {
+		defer l.mux.UnlockContext(ctx)
+		return do()
+	}()
 }
