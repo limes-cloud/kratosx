@@ -14,6 +14,7 @@ import (
 
 	"github.com/limes-cloud/kratosx/config"
 	gte "github.com/limes-cloud/kratosx/library/db/gormtranserror"
+	"github.com/limes-cloud/kratosx/library/db/initializer"
 )
 
 type DB interface {
@@ -124,6 +125,12 @@ func (d *db) initFactory(name string, conf *config.Database) error {
 		}
 		if err := gte.NewGlobalGormErrorPlugin(opts...).Initialize(client); err != nil {
 			panic("gorm transform error:" + err.Error())
+		}
+	}
+
+	if conf.Config.Initializer != nil && conf.Config.Initializer.Enable {
+		if err := initializer.New(client, conf.Config.Initializer.Path, conf.Config.Initializer.Force).Exec(); err != nil {
+			panic("db init error:" + err.Error())
 		}
 	}
 

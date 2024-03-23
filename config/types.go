@@ -80,6 +80,7 @@ type DBConfig struct {
 	MaxLifetime    time.Duration
 	MaxOpenConn    int
 	MaxIdleConn    int
+	Initializer    *DBInitializer
 }
 
 type DBTransformError struct {
@@ -89,6 +90,12 @@ type DBTransformError struct {
 		AddForeign *string
 		DelForeign *string
 	}
+}
+
+type DBInitializer struct {
+	Enable bool
+	Force  bool
+	Path   string
 }
 
 type Redis struct {
