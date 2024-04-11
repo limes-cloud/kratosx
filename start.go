@@ -6,6 +6,7 @@ import (
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/config/file"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
+	"github.com/go-kratos/kratos/v2/transport"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library"
@@ -72,7 +73,15 @@ func New(opts ...Option) *kratos.App {
 		hs := httpServer(srv.Http, srv.Count, mds)
 		gs := grpcServer(srv.Grpc, srv.Count, mds)
 		o.regSrvFn(o.config, hs, gs)
-		defOpts = append(defOpts, kratos.Server(hs, gs))
+
+		var srvList []transport.Server
+		if hs != nil {
+			srvList = append(srvList, hs)
+		}
+		if gs != nil {
+			srvList = append(srvList, gs)
+		}
+		defOpts = append(defOpts, kratos.Server(srvList...))
 
 		if srv.Registry != nil {
 			reg, err := registry.Create(*srv.Registry)

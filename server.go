@@ -17,6 +17,9 @@ import (
 )
 
 func grpcServer(c *config.GrpcService, count int, md []middleware.Middleware) *grpc.Server {
+	if c == nil {
+		return nil
+	}
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(md...),
 	}
@@ -44,6 +47,9 @@ func grpcServer(c *config.GrpcService, count int, md []middleware.Middleware) *g
 }
 
 func httpServer(c *config.HttpService, count int, md []middleware.Middleware) *http.Server {
+	if c == nil {
+		return nil
+	}
 	var opts = []http.ServerOption{
 		http.Middleware(md...),
 	}
