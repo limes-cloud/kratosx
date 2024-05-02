@@ -55,6 +55,7 @@ type Context interface {
 	Config() config.Config
 	Endpoint() []string
 
+	Clone() Context
 	Deadline() (deadline time.Time, ok bool)
 	Done() <-chan struct{}
 	Err() error
@@ -64,6 +65,11 @@ type Context interface {
 type ctx struct {
 	context.Context
 	kratos.AppInfo
+}
+
+type cloneCtx struct {
+	child  context.Context
+	parent context.Context
 }
 
 // MustContext returns the Transport value stored in ctx, if any.
@@ -85,12 +91,12 @@ func (c *ctx) Logger() *log.Helper {
 	if !c.Config().IsInit() {
 		return log.NewHelper(log.DefaultLogger)
 	}
-	return logger.Helper().WithContext(c.Context)
+	return logger.Helper().WithContext(c)
 }
 
 // DB 数据库实例
 func (c *ctx) DB(name ...string) *gorm.DB {
-	return db.Instance().Get(name...).WithContext(c.Context)
+	return db.Instance().Get(name...).WithContext(c.Ctx())
 }
 
 // Redis 获取缓存实例
@@ -178,6 +184,13 @@ func (c *ctx) GrpcConn(srvName string) (*grpc.ClientConn, error) {
 	return cli.Conn(c.Ctx())
 }
 
+func (c *ctx) Clone() Context {
+	return MustContext(&cloneCtx{
+		child:  context.Background(),
+		parent: c.Context,
+	})
+}
+
 // Env 获取配置环境
 func (c *ctx) Env() string {
 	return c.Config().App().Env
@@ -197,4 +210,24 @@ func (c *ctx) Err() error {
 
 func (c *ctx) Value(key any) any {
 	return c.Context.Value(key)
+}
+
+func (c *cloneCtx) Ctx() context.Context {
+	return c
+}
+
+func (c *cloneCtx) Deadline() (deadline time.Time, ok bool) {
+	return c.child.Deadline()
+}
+
+func (c *cloneCtx) Done() <-chan struct{} {
+	return c.child.Done()
+}
+
+func (c *cloneCtx) Err() error {
+	return c.child.Err()
+}
+
+func (c *cloneCtx) Value(key any) any {
+	return c.parent.Value(key)
 }
