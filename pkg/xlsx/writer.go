@@ -18,6 +18,7 @@ type Writer interface {
 	Sheet(name string) Writer
 	Index(ind int) Writer
 	WriteRow(row []any) error
+	Save() error
 }
 
 type writer struct {
