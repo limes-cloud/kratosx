@@ -49,7 +49,7 @@ var instance *authentication
 
 const (
 	redisKey  = "rbac_authentication"
-	authMdKey = "x-md-auth"
+	authMdKey = "x-md-global-auth"
 )
 
 func Instance() Authentication {
