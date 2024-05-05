@@ -10,7 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/selector"
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/go-kratos/kratos/v2/transport/http"
-	jwtv4 "github.com/golang-jwt/jwt/v4"
+	jwtv5 "github.com/golang-jwt/jwt/v5"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/jwt"
@@ -22,7 +22,7 @@ func Jwt(conf *config.JWT) middleware.Middleware {
 		return nil
 	}
 
-	keyFunc := func(token *jwtv4.Token) (any, error) {
+	keyFunc := func(token *jwtv5.Token) (any, error) {
 		return []byte(conf.Secret), nil
 	}
 
@@ -93,7 +93,7 @@ func JwtUnique(conf *config.JWT) middleware.Middleware {
 				return handler(ctx, req)
 			}
 
-			mapClaims, ok := claims.(jwtv4.MapClaims)
+			mapClaims, ok := claims.(jwtv5.MapClaims)
 			if !ok {
 				return handler(ctx, req)
 			}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
-	jwtv4 "github.com/golang-jwt/jwt/v4"
+	jwtv5 "github.com/golang-jwt/jwt/v5"
 	json "github.com/json-iterator/go"
 
 	"github.com/limes-cloud/kratosx/config"
@@ -75,15 +75,15 @@ func (j *jwt) NewToken(m map[string]any) (string, error) {
 		return "", errors.New("jwt config not enable or configure")
 	}
 
-	m["exp"] = jwtv4.NewNumericDate(time.Now().Add(j.conf.Expire + time.Second)) // 过期时间
-	m["nbf"] = jwtv4.NewNumericDate(time.Now())                                  // 生效时间
-	m["iat"] = jwtv4.NewNumericDate(time.Now())                                  // 签发时间
+	m["exp"] = jwtv5.NewNumericDate(time.Now().Add(j.conf.Expire + time.Second)) // 过期时间
+	m["nbf"] = jwtv5.NewNumericDate(time.Now())                                  // 生效时间
+	m["iat"] = jwtv5.NewNumericDate(time.Now())                                  // 签发时间
 
-	keyFunc := func(token *jwtv4.Token) (any, error) {
+	keyFunc := func(token *jwtv5.Token) (any, error) {
 		return []byte(j.conf.Secret), nil
 	}
 
-	jwtToken := jwtv4.NewWithClaims(jwtv4.SigningMethodHS256, jwtv4.MapClaims(m))
+	jwtToken := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, jwtv5.MapClaims(m))
 	key, err := keyFunc(jwtToken)
 	if err != nil {
 		return "", err
@@ -127,19 +127,19 @@ func (j *jwt) ParseMapClaims(ctx context.Context) (map[string]any, error) {
 			return nil, kratosJwt.ErrMissingJwtToken
 		}
 
-		parser, _ := jwtv4.Parse(token, func(token *jwtv4.Token) (any, error) {
+		parser, _ := jwtv5.Parse(token, func(token *jwtv5.Token) (any, error) {
 			return []byte(j.conf.Secret), nil
 		})
 		if parser == nil || parser.Claims == nil {
 			return nil, kratosJwt.ErrTokenInvalid
 		}
 
-		tokenInfo, is = parser.Claims.(jwtv4.MapClaims)
+		tokenInfo, is = parser.Claims.(jwtv5.MapClaims)
 		if !is {
 			return nil, kratosJwt.ErrTokenParseFail
 		}
 	}
-	claims, is := tokenInfo.(jwtv4.MapClaims)
+	claims, is := tokenInfo.(jwtv5.MapClaims)
 	if !is {
 		return nil, kratosJwt.ErrTokenParseFail
 	}
@@ -161,14 +161,14 @@ func (j *jwt) Renewal(ctx context.Context) (string, error) {
 		return "", errors.New("token is miss")
 	}
 
-	tokenInfo, _ := jwtv4.Parse(token, func(token *jwtv4.Token) (any, error) {
+	tokenInfo, _ := jwtv5.Parse(token, func(token *jwtv5.Token) (any, error) {
 		return []byte(j.conf.Secret), nil
 	})
 	if tokenInfo == nil || tokenInfo.Claims == nil {
 		return "", errors.New("token parse error")
 	}
 
-	claims, is := tokenInfo.Claims.(jwtv4.MapClaims)
+	claims, is := tokenInfo.Claims.(jwtv5.MapClaims)
 	if !is {
 		return "", errors.New("token format error")
 	}

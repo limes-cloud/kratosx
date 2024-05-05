@@ -17,7 +17,7 @@ import (
 	"github.com/go-kratos/kratos/v2/metadata"
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	"github.com/go-redis/redis/v8"
-	jwtv4 "github.com/golang-jwt/jwt/v4"
+	jwtv5 "github.com/golang-jwt/jwt/v5"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/db"
@@ -218,7 +218,7 @@ func (a *authentication) GetRole(ctx context.Context) (string, error) {
 	if !is { // 跳过jwt白名单的也不检测
 		return "", nil
 	}
-	claims, is := tokenInfo.(jwtv4.MapClaims)
+	claims, is := tokenInfo.(jwtv5.MapClaims)
 	if !is {
 		return "", errors.New("token format error")
 	}
