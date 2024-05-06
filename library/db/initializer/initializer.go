@@ -85,6 +85,7 @@ func (t *itr) Exec() error {
 	str := string(byteData)
 	str = strings.ReplaceAll(str, "BEGIN;", "")
 	str = strings.ReplaceAll(str, "COMMIT;", "")
+	str = strings.ReplaceAll(str, "COLLATE=utf8mb4_0900_ai_ci", "")
 
 	tx := t.db.Begin()
 	sqlList := strings.Split(str, ";\n")
