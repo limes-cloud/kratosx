@@ -2,8 +2,9 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 
-	midmetadata "github.com/go-kratos/kratos/v2/middleware/metadata"
 	"github.com/go-kratos/kratos/v2/selector"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	ggrpc "google.golang.org/grpc"
@@ -41,11 +42,11 @@ func (c *client) connByDirect(ctx context.Context) (*ggrpc.ClientConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn, err := grpc.DialInsecure(ctx,
+	opts := c.options()
+	opts = append(opts,
 		grpc.WithEndpoint(n.Address()),
-		grpc.WithMiddleware(midmetadata.Client()),
-		grpc.WithTimeout(c.applier.endpoint.Timeout),
 	)
+	conn, err := grpc.DialInsecure(ctx, opts...)
 	if err != nil {
 		done(ctx, selector.DoneInfo{Err: err})
 		return nil, err
@@ -54,10 +55,27 @@ func (c *client) connByDirect(ctx context.Context) (*ggrpc.ClientConn, error) {
 }
 
 func (c *client) connByDiscovery(ctx context.Context) (*ggrpc.ClientConn, error) {
-	return grpc.DialInsecure(ctx,
+	opts := c.options()
+	opts = append(opts,
 		grpc.WithEndpoint(DISCOVERY+":///"+c.applier.endpoint.Server),
-		grpc.WithMiddleware(midmetadata.Client()),
-		grpc.WithTimeout(c.applier.endpoint.Timeout),
 		grpc.WithDiscovery(c.applier.registry),
 	)
+	return grpc.DialInsecure(ctx, opts...)
+}
+
+func (c *client) options() []grpc.ClientOption {
+	var opts = []grpc.ClientOption{
+		grpc.WithMiddleware(Middlewares(c.applier.endpoint)...),
+		grpc.WithTimeout(c.applier.endpoint.Timeout),
+	}
+
+	// tls
+	if c.applier.endpoint.Tls != nil {
+		cp := x509.NewCertPool()
+		if cp.AppendCertsFromPEM([]byte(c.applier.endpoint.Tls.Ca)) {
+			tlsConf := &tls.Config{ServerName: c.applier.endpoint.Tls.Name, RootCAs: cp}
+			opts = append(opts, grpc.WithTLSConfig(tlsConf))
+		}
+	}
+	return opts
 }

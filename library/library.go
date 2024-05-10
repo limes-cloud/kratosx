@@ -12,7 +12,9 @@ import (
 	"github.com/limes-cloud/kratosx/library/logger"
 	"github.com/limes-cloud/kratosx/library/logging"
 	"github.com/limes-cloud/kratosx/library/pool"
+	"github.com/limes-cloud/kratosx/library/prometheus"
 	"github.com/limes-cloud/kratosx/library/redis"
+	"github.com/limes-cloud/kratosx/library/signature"
 )
 
 func Init(conf config.Config, fs logger.LogField) {
@@ -48,4 +50,10 @@ func Init(conf config.Config, fs logger.LogField) {
 
 	// grpc 客户端初始化
 	client.Init(conf.App().Server.Registry, conf.App().Client, conf.Watch)
+
+	// 签名验证器初始化
+	signature.Init(conf.App().Signature, conf.Watch)
+
+	// 初始化监控
+	prometheus.Init(conf.App().Prometheus, conf.Watch)
 }

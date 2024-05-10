@@ -20,6 +20,8 @@ import (
 type DB interface {
 	// Get 获取指定名称的db实例，不指定名称则返回第一个如果实例不存在则返回nil
 	Get(name ...string) *gorm.DB
+
+	TxKey(name ...string) string
 }
 
 type db struct {
@@ -146,6 +148,17 @@ func (d *db) initFactory(name string, conf *config.Database) error {
 	return nil
 }
 
+func (d *db) TxKey(name ...string) string {
+	if d.key == "" && len(name) == 0 {
+		return ""
+	}
+	key := d.key
+	if len(name) != 0 {
+		key = name[0]
+	}
+	return "db_tx_" + key
+}
+
 func (d *db) delete(name string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -222,6 +235,6 @@ func (d *db) create(conf *config.Database) error {
 	if err != nil {
 		return err
 	}
-	_ = connect.Exec(fmt.Sprintf("create database %s", conf.Connect.DBName))
+	_ = connect.Exec(fmt.Sprintf("CREATE DATABASE %s", conf.Connect.DBName))
 	return nil
 }

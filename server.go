@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/go-kratos/kratos/v2/encoding/json"
-	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/go-kratos/kratos/v2/transport/http"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -16,12 +15,13 @@ import (
 	"github.com/limes-cloud/kratosx/server"
 )
 
-func grpcServer(c *config.GrpcService, count int, md []middleware.Middleware) *grpc.Server {
+func grpcServer(c *config.GrpcService, count int, so []grpc.ServerOption) *grpc.Server {
 	if c == nil {
 		return nil
 	}
-	var opts = []grpc.ServerOption{
-		grpc.Middleware(md...),
+	var opts []grpc.ServerOption
+	for _, o := range so {
+		opts = append(opts, o)
 	}
 	if c.Network != "" {
 		opts = append(opts, grpc.Network(c.Network))
@@ -46,12 +46,13 @@ func grpcServer(c *config.GrpcService, count int, md []middleware.Middleware) *g
 	return grpc.NewServer(opts...)
 }
 
-func httpServer(c *config.HttpService, count int, md []middleware.Middleware) *http.Server {
+func httpServer(c *config.HttpService, count int, so []http.ServerOption) *http.Server {
 	if c == nil {
 		return nil
 	}
-	var opts = []http.ServerOption{
-		http.Middleware(md...),
+	var opts []http.ServerOption
+	for _, o := range so {
+		opts = append(opts, o)
 	}
 	if c.Network != "" {
 		opts = append(opts, http.Network(c.Network))

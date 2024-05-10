@@ -7,6 +7,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/validate"
 
 	"github.com/limes-cloud/kratosx/config"
+	"github.com/limes-cloud/kratosx/library/signature"
 )
 
 func New(conf config.Config) []middleware.Middleware {
@@ -14,19 +15,30 @@ func New(conf config.Config) []middleware.Middleware {
 
 	mds := []middleware.Middleware{
 		recovery.Recovery(),
+		// 限流
 		RateLimit(app.RateLimit),
-
-		Tracer(app.Name, app.Tracing),
-		Logging(app.Logging),
-		validate.Validator(),
-
-		IP(),
-		Jwt(app.JWT),
-		JwtBlack(app.JWT),
-		JwtUnique(app.JWT),
-		Authentication(app.Authentication),
-
+		// 监控
+		Metrics(app.Metrics),
+		// 元数据
 		metadata.Server(),
+		// 签名
+		signature.Instance().Server(),
+		// 链路
+		Tracer(app.Name, app.Tracing),
+		// 请求日志
+		Logging(app.Logging),
+		// 参数校验
+		validate.Validator(),
+		// ip
+		IP(),
+		// jwt
+		Jwt(app.JWT),
+		// jwt黑名单
+		JwtBlack(app.JWT),
+		// jwt 唯一设备
+		JwtUnique(app.JWT),
+		// 资源鉴权
+		Authentication(app.Authentication),
 	}
 	// 原地删除不启用的中间件
 	return removeDisableMiddleware(mds)

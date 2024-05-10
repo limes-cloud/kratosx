@@ -7,12 +7,13 @@ import (
 	"github.com/go-kratos/kratos/v2/config/file"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/go-kratos/kratos/v2/transport"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library"
 	"github.com/limes-cloud/kratosx/library/logger"
+	"github.com/limes-cloud/kratosx/library/pprof"
 	"github.com/limes-cloud/kratosx/library/registry"
-	"github.com/limes-cloud/kratosx/middleware"
 )
 
 const (
@@ -59,7 +60,7 @@ func New(opts ...Option) *kratos.App {
 	library.Init(o.config, o.loggerFields)
 
 	// 获取中间件
-	mds := middleware.New(o.config)
+
 	defOpts := []kratos.Option{
 		kratos.ID(o.config.App().ID),
 		kratos.Name(o.config.App().Name),
@@ -69,14 +70,24 @@ func New(opts ...Option) *kratos.App {
 
 	// 必注册服务
 	if o.regSrvFn != nil {
+		gsOpts, hsOpts := serverOptions(o.config)
 		srv := o.config.App().Server
-		hs := httpServer(srv.Http, srv.Count, mds)
-		gs := grpcServer(srv.Grpc, srv.Count, mds)
+		gs := grpcServer(srv.Grpc, srv.Count, gsOpts)
+		hs := httpServer(srv.Http, srv.Count, hsOpts)
 		o.regSrvFn(o.config, hs, gs)
 
 		var srvList []transport.Server
 		if hs != nil {
 			srvList = append(srvList, hs)
+			// 监控
+			if o.config.App().Metrics {
+				hs.Handle("/metrics", promhttp.Handler())
+			}
+
+			// pprof
+			if o.config.App().Server.Http.Pprof != nil {
+				pprof.PprofServer(o.config.App().Server.Http.Pprof, hs)
+			}
 		}
 		if gs != nil {
 			srvList = append(srvList, gs)

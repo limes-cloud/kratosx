@@ -1,4 +1,4 @@
-module github.com/limes-cloud/kratosx/cmd/protoc-gen-go-errors
+module github.com/limes-cloud/kratosx/cmd/protoc-gen-go-errorsx
 
 go 1.19
 

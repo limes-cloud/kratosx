@@ -1,9 +1,10 @@
 package signature
 
 import (
-	"github.com/limes-cloud/kratosx/config"
 	"testing"
 	"time"
+
+	"github.com/limes-cloud/kratosx/config"
 )
 
 func TestSign(t *testing.T) {
@@ -23,9 +24,9 @@ func TestSign(t *testing.T) {
 
 	watcher := func(key string, o config.WatchHandleFunc) {}
 	Init(&config.Signature{
-		Ak:   "app1",
-		Sk:   "123456",
-		Time: 3 * time.Second,
+		Ak:     "app1",
+		Sk:     "123456",
+		Expire: 3 * time.Second,
 	}, watcher)
 
 	signer := Instance()

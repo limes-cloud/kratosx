@@ -14,6 +14,7 @@ type App struct {
 		Registry *string
 		Http     *HttpService
 		Grpc     *GrpcService
+		Tls      *Tls
 	}
 	Signature      *Signature
 	Log            *Logger
@@ -30,6 +31,15 @@ type App struct {
 	Loader         map[string]string
 	Captcha        map[string]*Captcha
 	RateLimit      bool
+	Metrics        bool
+	Prometheus     []*Prometheus
+}
+
+type Tls struct {
+	Name string
+	Ca   string
+	Pem  string
+	Key  string
 }
 
 type GrpcService struct {
@@ -50,6 +60,12 @@ type HttpService struct {
 	FormatResponse bool
 	Cors           *Cors
 	Marshal        *Marshal
+	Pprof          *Pprof
+}
+
+type Pprof struct {
+	Query  string
+	Secret string
 }
 
 type Database struct {
@@ -216,7 +232,7 @@ type Signature struct {
 	Ak        string
 	Sk        string
 	Whitelist map[string]bool
-	Time      time.Duration
+	Expire    time.Duration
 }
 
 type Http struct {
@@ -228,14 +244,30 @@ type Http struct {
 }
 
 type Client struct {
-	Server   string
-	Type     string
-	Timeout  time.Duration
-	Metadata map[string]string
-	Backends []Backend
+	Server    string
+	Type      string
+	Timeout   time.Duration
+	Metadata  map[string]string
+	Backends  []Backend
+	Signature *Signature
+	Tls       *Tls
 }
 
 type Backend struct {
 	Target string
 	Weight *int64
+}
+
+type Prometheus struct {
+	Name       string
+	Type       string
+	Help       string
+	Namespace  string
+	Subsystem  string
+	Buckets    []float64
+	Labels     []string
+	Objectives map[float64]float64
+	MaxAge     time.Duration
+	AgeBuckets uint32
+	BufCap     uint32
 }

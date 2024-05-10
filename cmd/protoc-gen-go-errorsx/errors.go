@@ -7,11 +7,10 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/limes-cloud/kratosx/cmd/protoc-gen-go-errors/errors"
+	"github.com/limes-cloud/kratosx/cmd/protoc-gen-go-errorsx/errors"
 )
 
 const (

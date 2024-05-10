@@ -25,6 +25,7 @@ import (
 	"github.com/limes-cloud/kratosx/library/loader"
 	"github.com/limes-cloud/kratosx/library/logger"
 	"github.com/limes-cloud/kratosx/library/pool"
+	"github.com/limes-cloud/kratosx/library/prometheus"
 	rd "github.com/limes-cloud/kratosx/library/redis"
 )
 
@@ -94,9 +95,27 @@ func (c *ctx) Logger() *log.Helper {
 	return logger.Helper().WithContext(c)
 }
 
+func (c *ctx) Transaction(fn func(ctx Context) error, name ...string) error {
+	dbi := db.Instance()
+	return dbi.Get(name...).WithContext(c.Ctx()).Transaction(func(tx *gorm.DB) error {
+		cc := context.WithValue(c.Ctx(), dbi.TxKey(name...), tx)
+		return fn(MustContext(cc))
+	})
+}
+
 // DB 数据库实例
 func (c *ctx) DB(name ...string) *gorm.DB {
-	return db.Instance().Get(name...).WithContext(c.Ctx())
+	dbi := db.Instance()
+	tx, ok := c.Value(dbi.TxKey(name...)).(*gorm.DB)
+	if ok {
+		return tx
+	}
+	return dbi.Get(name...).WithContext(c.Ctx())
+}
+
+// Prometheus 监控
+func (c *ctx) Prometheus() prometheus.Prometheus {
+	return c.Prometheus()
 }
 
 // Redis 获取缓存实例
