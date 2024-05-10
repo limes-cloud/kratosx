@@ -8,9 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
+	"github.com/spf13/cobra"
 )
 
 // CmdClient represents the source command.

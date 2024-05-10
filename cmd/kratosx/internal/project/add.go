@@ -8,26 +8,23 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
-
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
-// Project is a project template.
-type Project struct {
-	Name string
-	Path string
+var repoAddIgnores = []string{
+	".git", ".github", "api", "README.md", "LICENSE", "go.mod", "go.sum", "third_party", "openapi.yaml", ".gitignore",
 }
 
-// New new a project from remote repo.
-func (p *Project) New(ctx context.Context, dir string, layout string, branch string) error {
+func (p *Project) Add(ctx context.Context, dir string, layout string, branch string, mod string, pkgPath string) error {
 	to := filepath.Join(dir, p.Name)
+
 	if _, err := os.Stat(to); !os.IsNotExist(err) {
 		fmt.Printf("🚫 %s already exists\n", p.Name)
+		override := false
 		prompt := &survey.Confirm{
 			Message: "📂 Do you want to override the folder ?",
 			Help:    "Delete the existing folder and create the project.",
 		}
-		var override bool
 		e := survey.AskOne(prompt, &override)
 		if e != nil {
 			return e
@@ -37,11 +34,16 @@ func (p *Project) New(ctx context.Context, dir string, layout string, branch str
 		}
 		os.RemoveAll(to)
 	}
-	fmt.Printf("🚀 Creating service %s, layout repo is %s, please wait a moment.\n\n", p.Name, layout)
+
+	fmt.Printf("🚀 Add service %s, layout repo is %s, please wait a moment.\n\n", p.Name, layout)
+
+	pkgPath = fmt.Sprintf("%s/%s", mod, pkgPath)
 	repo := base.NewRepo(layout, branch)
-	if err := repo.CopyTo(ctx, to, p.Name, []string{".git", ".github"}); err != nil {
+	err := repo.CopyToV2(ctx, to, pkgPath, repoAddIgnores, []string{filepath.Join(p.Path, "api"), "api"})
+	if err != nil {
 		return err
 	}
+
 	e := os.Rename(
 		filepath.Join(to, "cmd", "server"),
 		filepath.Join(to, "cmd", p.Name),
@@ -49,15 +51,16 @@ func (p *Project) New(ctx context.Context, dir string, layout string, branch str
 	if e != nil {
 		return e
 	}
+
 	base.Tree(to, dir)
 
-	fmt.Printf("\n🍺 Project creation succeeded %s\n", color.GreenString(p.Name))
-	fmt.Print("💻 Use the following command to start the project 👇:\n\n")
+	fmt.Printf("\n🍺 Repository creation succeeded %s\n", color.GreenString(p.Name))
+	fmt.Print("💻 Use the following command to add a project 👇:\n\n")
 
 	fmt.Println(color.WhiteString("$ cd %s", p.Name))
 	fmt.Println(color.WhiteString("$ go generate ./..."))
 	fmt.Println(color.WhiteString("$ go build -o ./bin/ ./... "))
-	fmt.Println(color.WhiteString("$ ./bin/%s -conf ./configs\n", p.Name))
+	fmt.Println(color.WhiteString("$ ./bin/%s -conf ./internal/conf/config.yaml\n", p.Name))
 	fmt.Println("			🤝 Thanks for using Kratosx")
 	fmt.Println("	📚 Tutorial: http://doc.qlime.cn")
 	return nil
