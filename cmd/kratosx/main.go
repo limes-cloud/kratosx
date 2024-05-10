@@ -3,13 +3,12 @@ package main
 import (
 	"log"
 
-	"github.com/spf13/cobra"
-
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/change"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/project"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/proto"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/run"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/upgrade"
+	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
