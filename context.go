@@ -33,6 +33,7 @@ type Context interface {
 	Env() string
 	Logger() *log.Helper
 	DB(name ...string) *gorm.DB
+	Transaction(fn func(ctx Context) error, name ...string) error
 	Redis(name ...string) *redis.Client
 	Go(runner pool.Runner) error
 	Loader(name string) []byte
