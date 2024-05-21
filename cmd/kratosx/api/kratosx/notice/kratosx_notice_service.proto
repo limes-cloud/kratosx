@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package kratosx.api.kratosx.notice.v1;
+
+option go_package = "./v1;v1";
+option java_multiple_files = true;
+option java_outer_classname = "NoticeV1";
+option java_package = "kratosx.api.kratosx.notice.v1";
+
+import "google/protobuf/empty.proto";
+import "google/api/annotations.proto";
+import "kratosx_notice.proto";
+
+service Notice{
+
+  // GetNotice 获取指定的通知
+  rpc GetNotice (GetNoticeRequest) returns (GetNoticeReply) {
+    option (google.api.http) = {
+      get: "/kratosx/notice/api/v1/notice",
+    };
+  }
+
+  // ListNotice 获取通知列表
+  rpc ListNotice (ListNoticeRequest) returns (ListNoticeReply) {
+    option (google.api.http) = {
+      get: "/kratosx/notice/api/v1/notice",
+    };
+  }
+
+  // CreateNotice 创建通知
+  rpc CreateNotice (CreateNoticeRequest) returns (CreateNoticeReply) {
+    option (google.api.http) = {
+      post: "/kratosx/notice/api/v1/notice",
+      body: "*"
+    };
+  }
+
+  // ImportNotice 导入通知
+  rpc ImportNotice (ImportNoticeRequest) returns (ImportNoticeReply) {
+    option (google.api.http) = {
+      post: "/kratosx/notice/api/v1/notice/import",
+      body: "*"
+    };
+  }
+
+  // ExportNotice 导出通知
+  rpc ExportNotice (ExportNoticeRequest) returns (ExportNoticeReply) {
+    option (google.api.http) = {
+      post: "/kratosx/notice/api/v1/notice/export",
+      body: "*"
+    };
+  }
+
+  // UpdateNotice 更新通知
+  rpc UpdateNotice (UpdateNoticeRequest) returns (UpdateNoticeReply) {
+    option (google.api.http) = {
+      put: "/kratosx/notice/api/v1/notice",
+      body: "*"
+    };
+  }
+
+  // DeleteNotice 删除通知
+  rpc DeleteNotice (DeleteNoticeRequest) returns (DeleteNoticeReply) {
+    option (google.api.http) = {
+      delete: "/kratosx/notice/api/v1/notice",
+    };
+  }
+
+  // BatchDeleteNotice 批量删除通知
+  rpc BatchDeleteNotice (BatchDeleteNoticeRequest) returns (BatchDeleteNoticeReply) {
+    option (google.api.http) = {
+      delete: "/kratosx/notice/api/v1/notice",
+    };
+  }
+ 
+}

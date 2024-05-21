@@ -1,6 +1,6 @@
 module github.com/limes-cloud/kratosx/cmd/kratosx
 
-go 1.19
+go 1.21.1
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7

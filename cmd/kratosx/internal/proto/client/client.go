@@ -142,7 +142,6 @@ func generate(proto string, args []string) error {
 		"--go-httpx_out=" + outPath,
 		"--go-errorsx_out=" + outPath,
 		"--openapi_out=" + outPath,
-		"--validate_out=lang=go:" + outPath,
 	}
 	input = append(input, inputExt...)
 	protoBytes, err := os.ReadFile(proto)
