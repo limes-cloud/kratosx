@@ -1,10 +1,12 @@
-package server
+package cors
 
 import (
+	"time"
+
 	thttp "github.com/go-kratos/kratos/v2/transport/http"
 	"github.com/gorilla/handlers"
+
 	ec "github.com/limes-cloud/kratosx/config"
-	"time"
 )
 
 func Cors(conf *ec.Cors) thttp.ServerOption {

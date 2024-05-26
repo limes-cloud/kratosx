@@ -10,13 +10,15 @@ func Is{{.CamelValue}}(err error) bool {
 }
 
 {{ if .HasComment }}{{ .Comment }}{{ end -}}
-func {{ .CamelValue }}Format(format string, args ...any) *errors.Error {
-	 return errors.New({{ .HTTPCode }}, {{ .Name }}_{{ .Value }}.String(), "{{ .Message }}:"+fmt.Sprintf(format, args...))
-}
-
-
-{{ if .HasComment }}{{ .Comment }}{{ end -}}
-func {{ .CamelValue }}() *errors.Error {
-	 return errors.New({{ .HTTPCode }}, {{ .Name }}_{{ .Value }}.String(), "{{ .Message }}")
+func {{ .CamelValue }}(args ...any) *errors.Error {
+    switch len(args) {
+    	case 0:
+	        return errors.New({{ .HTTPCode }}, {{ .Name }}_{{ .Value }}.String(), "{{ .Message }}")
+    	case 1:
+	        return errors.New({{ .HTTPCode }}, {{ .Name }}_{{ .Value }}.String(), "{{ .Message }}:"+fmt.Sprint(args[0]))
+    	default:
+    	    msg := fmt.Sprintf(fmt.Sprint(args[0]), args[1:]...)
+	        return errors.New({{ .HTTPCode }}, {{ .Name }}_{{ .Value }}.String(), "{{ .Message }}:"+msg)
+    }
 }
 {{- end }}

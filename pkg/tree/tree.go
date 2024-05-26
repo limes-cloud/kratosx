@@ -7,6 +7,20 @@ type Tree interface {
 	ChildrenNode() []Tree
 }
 
+func ToTree(src any) []Tree {
+	var ts []Tree
+	array, ok := src.([]any)
+	if !ok {
+		return ts
+	}
+	for _, item := range array {
+		if tr, ok := item.(Tree); ok {
+			ts = append(ts, tr)
+		}
+	}
+	return ts
+}
+
 func BuildArrayTree(array []Tree) []Tree {
 	maxLen := len(array)
 	var rootArray []Tree

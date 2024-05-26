@@ -15,7 +15,7 @@ type Repo interface {
 	Create{{.Object}}(ctx kratosx.Context, req *{{.Object}}) (uint32, error)
 
 	// Import{{.Object}} 导入{{.Title}}
-	Import{{.Object}}(ctx kratosx.Context, req []*{{.Object}}) (uint32, uint32, error)
+	Import{{.Object}}(ctx kratosx.Context, req []*{{.Object}}) (uint32, error)
 
 	// Export{{.Object}} 导出{{.Title}}
 	Export{{.Object}}(ctx kratosx.Context, req *Export{{.Object}}Request) (string, error)
@@ -23,9 +23,21 @@ type Repo interface {
 	// Update{{.Object}} 更新{{.Title}}
 	Update{{.Object}}(ctx kratosx.Context, req *{{.Object}}) error
 
-	// Delete{{.Object}} 删除{{.Title}}
-	Delete{{.Object}}(ctx kratosx.Context, id uint32) error
+	// Update{{.Object}}Status 更新{{.Title}}状态
+	Update{{.Object}}Status (ctx kratosx.Context, id uint32, status bool) error
 
-	// BatchDelete{{.Object}} 批量删除{{.Title}}
-	BatchDelete{{.Object}}(ctx kratosx.Context, ids []uint32) (uint32, error)
+	// Delete{{.Object}} 删除{{.Title}}
+	Delete{{.Object}}(ctx kratosx.Context, ids []uint32) (uint32, error)
+
+	// GetTrash{{.Object}} 获取指定的回收站{{.Title}}
+	GetTrash{{.Object}}(ctx kratosx.Context, id uint32) (*{{.Object}}, error)
+
+	// ListTrash{{.Object}} 获取回收站{{.Title}}列表
+	ListTrash{{.Object}}(ctx kratosx.Context, req *ListTrash{{.Object}}Request) ([]*{{.Object}}, uint32, error)
+
+	// DeleteTrash{{.Object}} 彻底删除{{.Title}}
+	DeleteTrash{{.Object}}(ctx kratosx.Context, ids []uint32) (uint32, error)
+
+	// RevertTrash{{.Object}} 还原{{.Title}}
+	RevertTrash{{.Object}}(ctx kratosx.Context, id uint32) error
 }

@@ -11,13 +11,15 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
-const (
-	bizRepoPath   = "internal/autocode/template/biz/repo.tpl"
-	bizTypesPath  = "internal/autocode/template/biz/types.tpl"
-	bizEntityPath = "internal/autocode/template/biz/entity.tpl"
-	bizBizPath    = "internal/autocode/template/biz/biz.tpl"
+var (
+	bizRepoPath   = base.KratosxCliMod() + "/internal/autocode/template/biz/repo.tpl"
+	bizTypesPath  = base.KratosxCliMod() + "/internal/autocode/template/biz/types.tpl"
+	bizEntityPath = base.KratosxCliMod() + "/internal/autocode/template/biz/entity.tpl"
+	bizBizPath    = base.KratosxCliMod() + "/internal/autocode/template/biz/biz.tpl"
 )
 
 type biz struct {
@@ -144,6 +146,33 @@ func (b *biz) genRepo(object *Object) (*bizRepo, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	filedMap := object.FieldMap()
+	for _, list := range object.Unique {
+		var (
+			keys    []string
+			params  []string
+			codeTpl = `// %s 获取指定的%s
+							%s(ctx kratosx.Context, %s) (*%s, error)`
+		)
+		for _, item := range list {
+			if toUpperCamelCase(item) == toUpperCamelCase("deleted_at") {
+				continue
+			}
+			field, ok := filedMap[item]
+			if !ok {
+				continue
+			}
+			stp := b.mapping[field.Type].Struct
+			params = append(params, fmt.Sprintf("%s %s", toLowerCamelCase(field.Keyword), stp))
+			keys = append(keys, toUpperCamelCase(item))
+		}
+		funcName := fmt.Sprintf("Get%sBy%s", toUpperCamelCase(object.Keyword), strings.Join(keys, "And"))
+		code := fmt.Sprintf(codeTpl, funcName, object.Comment, funcName, strings.Join(params, ","), toUpperCamelCase(object.Keyword))
+		newPrv.FunctionSort = append(newPrv.FunctionSort, funcName)
+		newPrv.FunctionMap[funcName] = code
+	}
+
 	srv.Package = newPrv.Package
 	srv.Imports = append(srv.Imports, newPrv.Imports...)
 	srv.FunctionSort = append(srv.FunctionSort, newPrv.FunctionSort...)
@@ -277,6 +306,7 @@ func (b *biz) renderRepo(object *Object) (string, error) {
 
 func (b *biz) genTypesTplVariable(object *Object) map[string]any {
 	var (
+		getFields  []string
 		listFields []string
 		queryConds []string
 	)
@@ -287,12 +317,27 @@ func (b *biz) genTypesTplVariable(object *Object) map[string]any {
 	listFields = append(listFields, "\tOrder *string `json:\"order\"`")
 	listFields = append(listFields, "\tOrderBy *string `json:\"orderBy\"`")
 
+	var unique = map[string]bool{"Id": true}
+	for _, list := range object.Unique {
+		for _, item := range list {
+			unique[toUpperCamelCase(item)] = true
+		}
+	}
+	delete(unique, toUpperCamelCase("deleted_at"))
+
 	for _, field := range object.Fields {
+		tp := b.mapping[field.Type].Struct
+		if unique[toUpperCamelCase(field.Keyword)] {
+			getFields = append(getFields, fmt.Sprintf("\t%s *%s `json:\"%s\"`",
+				toUpperCamelCase(field.Keyword),
+				tp,
+				toLowerCamelCase(field.Keyword),
+			))
+		}
+
 		if field.QueryType == "" {
 			continue
 		}
-
-		tp := b.mapping[field.Type].Struct
 		switch strings.ToLower(field.QueryType) {
 		case _in, _notIn, _between:
 			queryConds = append(queryConds, fmt.Sprintf("\t%s []%s `json:\"%s\"`",
@@ -310,6 +355,7 @@ func (b *biz) genTypesTplVariable(object *Object) map[string]any {
 	}
 	listFields = append(listFields, queryConds...)
 	return map[string]any{
+		"GetFields":    strings.Join(getFields, "\n"),
 		"ListFields":   strings.Join(listFields, "\n"),
 		"ExportFields": strings.Join(queryConds, "\n"),
 		"Module":       toLowerCase(object.Module),
@@ -472,8 +518,8 @@ func (b *biz) genEntityTplVariable(object *Object) map[string]any {
 		}
 		fields = append(fields, fmt.Sprintf("\t%s %s%s `json:\"%s\"`",
 			toUpperCamelCase(field.Keyword),
-			tp,
 			opt,
+			tp,
 			toLowerCamelCase(field.Keyword),
 		))
 
@@ -501,6 +547,7 @@ func (b *biz) genEntityTplVariable(object *Object) map[string]any {
 		"Fields": strings.Join(fields, "\n"),
 		"Module": toLowerCase(object.Module),
 		"Object": toUpperCamelCase(object.Keyword),
+		"IsTree": object.Type == _objectTypeTree,
 	}
 }
 
@@ -544,6 +591,14 @@ func (b *biz) genEntity(object *Object) (*bizEntity, error) {
 }
 
 func (b *biz) scanEntity(src string) (*bizEntity, error) {
+	nodeToString := func(fset *token.FileSet, node ast.Node) (string, error) {
+		var buf bytes.Buffer
+		if err := format.Node(&buf, fset, node); err != nil {
+			return "", err
+		}
+		return buf.String(), nil
+	}
+
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "", src, parser.ParseComments)
 	if err != nil {
@@ -562,6 +617,37 @@ func (b *biz) scanEntity(src string) (*bizEntity, error) {
 			tps.Imports = append(tps.Imports, imp.Name.Name+" "+imp.Path.Value)
 		} else {
 			tps.Imports = append(tps.Imports, imp.Path.Value)
+		}
+	}
+
+	for _, d := range f.Decls {
+		switch decl := d.(type) {
+		case *ast.FuncDecl:
+			body, err := nodeToString(fset, decl)
+			if err != nil {
+				continue
+			}
+			funcName := decl.Name.Name
+			tps.EntitySort = append(tps.EntitySort, funcName)
+			tps.EntityMap[funcName] = body
+
+		case *ast.GenDecl:
+			if decl.Tok == token.TYPE { // Handle type declarations
+				for _, spec := range decl.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if !ok {
+						continue
+					}
+					body, err := nodeToString(fset, decl)
+					if err != nil {
+						continue
+					}
+
+					typeName := typeSpec.Name.Name
+					tps.EntitySort = append(tps.EntitySort, typeName)
+					tps.EntityMap[typeName] = body
+				}
+			}
 		}
 	}
 
@@ -607,7 +693,6 @@ func (b *biz) renderEntity(object *Object) (string, error) {
 
 	var (
 		sb strings.Builder
-		md = object.MethodStatus()
 	)
 	// Write the package statement
 	fmt.Fprintf(&sb, "package %s\n\n", tps.Package)
@@ -621,16 +706,16 @@ func (b *biz) renderEntity(object *Object) (string, error) {
 		sb.WriteString(")\n\n")
 	}
 
+	treeMd := []string{"ID", "Parent", "AppendChildren", "ChildrenNode"}
 	// Write each type definition in the specified order
 	for _, typeName := range tps.EntitySort {
 		typeDef, ok := tps.EntityMap[typeName]
 		if !ok {
 			continue // Skip if there is no definition for the type name
 		}
-		typeName = strings.TrimSuffix(typeName, "Request")
-		typeName = strings.TrimSuffix(typeName, "Reply")
-		if !object.HasMethod(md, typeName) {
-			continue // Skip if there is no definition for the function name
+
+		if object.Type != _objectTypeTree && inList(treeMd, typeName) {
+			continue
 		}
 
 		// Write the type definition including comments
@@ -647,11 +732,43 @@ func (b *biz) renderEntity(object *Object) (string, error) {
 }
 
 func (b *biz) genBizTplVariable(object *Object) map[string]any {
+	var (
+		filedMap = object.FieldMap()
+		getCodes []string
+	)
+	for _, list := range object.Unique {
+		var (
+			keys    []string
+			params  []string
+			conds   []string
+			codeTpl = "if %s {\n\tres, err = u.repo.%s(ctx, %s)\n\t}"
+		)
+
+		for _, item := range list {
+			if toUpperCamelCase(item) == toUpperCamelCase("deleted_at") {
+				continue
+			}
+			field, ok := filedMap[item]
+			if !ok {
+				continue
+			}
+			conds = append(conds, fmt.Sprintf("req.%s != nil", toUpperCamelCase(field.Keyword)))
+			params = append(params, fmt.Sprintf("*req.%s", toUpperCamelCase(field.Keyword)))
+			keys = append(keys, toUpperCamelCase(item))
+		}
+		funcName := fmt.Sprintf("Get%sBy%s", toUpperCamelCase(object.Keyword), strings.Join(keys, "And"))
+		code := fmt.Sprintf(codeTpl, strings.Join(conds, " && "), funcName, strings.Join(params, ","))
+		getCodes = append(getCodes, code)
+	}
+
 	return map[string]any{
+		"GetCodes":   strings.Join(getCodes, "else "),
 		"Server":     object.Server,
 		"ServerName": object.ServerName(),
 		"Module":     toLowerCase(object.Module),
 		"Object":     toUpperCamelCase(object.Keyword),
+		"IsTree":     object.Type == _objectTypeTree,
+		"Title":      object.Comment,
 	}
 }
 
@@ -682,6 +799,7 @@ func (b *biz) genBiz(object *Object) (*bizBiz, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	oldBiz.Package = newBiz.Package
 	oldBiz.Imports = append(oldBiz.Imports, newBiz.Imports...)
 	oldBiz.BizSort = append(oldBiz.BizSort, newBiz.BizSort...)

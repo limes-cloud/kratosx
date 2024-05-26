@@ -29,7 +29,7 @@ var (
 
 func New(opts ...Option) *kratos.App {
 	o := &options{
-		config: config.New(file.NewSource("internal/config/config.yaml")),
+		config: config.New(file.NewSource("internal/conf/conf.yaml")),
 	}
 
 	for _, opt := range opts {
@@ -60,7 +60,6 @@ func New(opts ...Option) *kratos.App {
 	library.Init(o.config, o.loggerFields)
 
 	// 获取中间件
-
 	defOpts := []kratos.Option{
 		kratos.ID(o.config.App().ID),
 		kratos.Name(o.config.App().Name),
@@ -77,19 +76,18 @@ func New(opts ...Option) *kratos.App {
 		o.regSrvFn(o.config, hs, gs)
 
 		var srvList []transport.Server
-		if hs != nil {
+		if srv.Http != nil {
 			srvList = append(srvList, hs)
 			// 监控
 			if o.config.App().Metrics {
 				hs.Handle("/metrics", promhttp.Handler())
 			}
-
 			// pprof
 			if o.config.App().Server.Http.Pprof != nil {
 				pprof.PprofServer(o.config.App().Server.Http.Pprof, hs)
 			}
 		}
-		if gs != nil {
+		if srv.Grpc != nil {
 			srvList = append(srvList, gs)
 		}
 		defOpts = append(defOpts, kratos.Server(srvList...))

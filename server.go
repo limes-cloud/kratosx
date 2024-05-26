@@ -12,12 +12,13 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/limes-cloud/kratosx/config"
-	"github.com/limes-cloud/kratosx/server"
+	"github.com/limes-cloud/kratosx/library/cors"
+	"github.com/limes-cloud/kratosx/library/httpencoder"
 )
 
 func grpcServer(c *config.GrpcService, count int, so []grpc.ServerOption) *grpc.Server {
 	if c == nil {
-		return nil
+		return grpc.NewServer()
 	}
 	var opts []grpc.ServerOption
 	for _, o := range so {
@@ -48,7 +49,7 @@ func grpcServer(c *config.GrpcService, count int, so []grpc.ServerOption) *grpc.
 
 func httpServer(c *config.HttpService, count int, so []http.ServerOption) *http.Server {
 	if c == nil {
-		return nil
+		return http.NewServer()
 	}
 	var opts []http.ServerOption
 	for _, o := range so {
@@ -74,10 +75,10 @@ func httpServer(c *config.HttpService, count int, so []http.ServerOption) *http.
 		opts = append(opts, http.Timeout(c.Timeout))
 	}
 	if c.FormatResponse {
-		opts = append(opts, server.HttpEncoder()...)
+		opts = append(opts, httpencoder.HttpEncoder()...)
 	}
 	if c.Cors != nil {
-		opts = append(opts, server.Cors(c.Cors))
+		opts = append(opts, cors.Cors(c.Cors))
 	}
 	if c.Marshal != nil {
 		json.MarshalOptions = protojson.MarshalOptions{

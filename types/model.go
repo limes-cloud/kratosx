@@ -13,19 +13,19 @@ type PageOptions struct {
 }
 
 type CreateModel struct {
-	ID        uint32 `json:"id" gorm:"primaryKey;autoIncrement;comment:主键ID"`
-	CreatedAt int64  `json:"created_at,omitempty" gorm:"index;comment:创建时间"`
+	Id        uint32 `json:"id" gorm:"primaryKey;autoIncrement;comment:主键ID"`
+	CreatedAt int64  `json:"createdAt,omitempty" gorm:"index;comment:创建时间"`
 }
 
 type BaseModel struct {
-	ID        uint32 `json:"id" gorm:"primaryKey;autoIncrement;comment:主键ID"`
-	CreatedAt int64  `json:"created_at,omitempty" gorm:"index;comment:创建时间"`
-	UpdatedAt int64  `json:"updated_at,omitempty" gorm:"index;comment:修改时间"`
+	Id        uint32 `json:"id" gorm:"primaryKey;autoIncrement;comment:主键ID"`
+	CreatedAt int64  `json:"createdAt,omitempty" gorm:"index;comment:创建时间"`
+	UpdatedAt int64  `json:"updatedAt,omitempty" gorm:"index;comment:修改时间"`
 }
 
 type DeleteModel struct {
-	ID        uint32    `json:"id" gorm:"primaryKey;autoIncrement;comment:主键ID"`
-	CreatedAt int64     `json:"created_at,omitempty" gorm:"index;comment:创建时间"`
-	UpdatedAt int64     `json:"updated_at,omitempty" gorm:"index;comment:修改时间"`
-	DeletedAt NullInt64 `json:"-" gorm:"index;comment:删除时间"`
+	Id        uint32    `json:"id" gorm:"primaryKey;autoIncrement;comment:主键ID"`
+	CreatedAt int64     `json:"createdAt,omitempty" gorm:"index;comment:创建时间"`
+	UpdatedAt int64     `json:"updatedAt,omitempty" gorm:"index;comment:修改时间"`
+	DeletedAt NullInt64 `json:"deletedAt" gorm:"index;comment:删除时间"`
 }

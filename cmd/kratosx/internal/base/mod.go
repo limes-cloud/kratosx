@@ -60,3 +60,25 @@ func KratosMod() string {
 	// $GOPATH/src/github.com/limes-cloud/kratos
 	return filepath.Join(gopath, "src", "github.com", "go-kratos", "kratos")
 }
+
+// KratosxCliMod returns kratos mod.
+func KratosxCliMod() string {
+	path := os.Getenv("AUTOCODE_TEMP_PATH")
+	if path != "" {
+		return path
+	}
+	// go 1.15+ read from env GOMODCACHE
+	cacheOut, _ := exec.Command("go", "env", "GOMODCACHE").Output()
+	cachePath := strings.Trim(string(cacheOut), "\n")
+	pathOut, _ := exec.Command("go", "env", "GOPATH").Output()
+	gopath := strings.Trim(string(pathOut), "\n")
+	if cachePath == "" {
+		cachePath = filepath.Join(gopath, "pkg", "mod")
+	}
+	if path, err := ModuleVersion("github.com/limes-cloud/kratosx"); err == nil {
+		// $GOPATH/pkg/mod/github.com/limes-cloud/kratos@v2
+		return filepath.Join(cachePath, path+"/cmd/kratosx")
+	}
+	// $GOPATH/src/github.com/limes-cloud/kratos
+	return filepath.Join(gopath, "src", "github.com", "limes-cloud", "kratosx", "cmd", "kratosx")
+}

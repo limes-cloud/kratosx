@@ -1,10 +1,13 @@
-package server
+package httpencoder
 
 import (
+	"fmt"
+	stdhttp "net/http"
+	"unsafe"
+
 	"github.com/go-kratos/kratos/v2/encoding"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/transport/http"
-	stdhttp "net/http"
 )
 
 // httpResponse 响应结构体
@@ -17,7 +20,7 @@ type httpResponse struct {
 func HttpEncoder() []http.ServerOption {
 	return []http.ServerOption{
 		http.ResponseEncoder(encoderResponse()),
-		//http.ErrorEncoder(encoderError()),
+		// http.ErrorEncoder(encoderError()),
 	}
 }
 
@@ -27,18 +30,16 @@ func encoderResponse() http.EncodeResponseFunc {
 		if i == nil {
 			return nil
 		}
-		resp := &httpResponse{
-			Code:    stdhttp.StatusOK,
-			Message: "success!",
-			Data:    i,
-		}
+		tpl := `{"code":200,"message":"success!","data":%s}`
 		codec := encoding.GetCodec("json")
-		data, err := codec.Marshal(resp)
+		data, err := codec.Marshal(i)
 		if err != nil {
 			return err
 		}
+		reply := fmt.Sprintf(tpl, *(*string)(unsafe.Pointer(&data)))
+
 		w.Header().Set("Content-Type", "application/json")
-		_, err = w.Write(data)
+		_, err = w.Write(*(*[]byte)(unsafe.Pointer(&reply)))
 		if err != nil {
 			return err
 		}

@@ -10,16 +10,19 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
-const (
-	srvServicePath = "internal/autocode/template/service/service.tpl"
+var (
+	srvServicePath  = base.KratosxCliMod() + "/internal/autocode/template/service/service.tpl"
+	srvEntrancePath = base.KratosxCliMod() + "/internal/autocode/template/service/entrance.tpl"
 )
 
 type service struct {
 }
 
-type document struct {
+type serverSrv struct {
 	Package string
 	Imports []string
 	Sort    []string
@@ -30,25 +33,30 @@ func GenService(object *Object) (map[string]string, error) {
 	b := &service{}
 	reply := map[string]string{}
 
-	repoCode, err := b.renderSrv(object)
+	srvCode, err := b.renderSrv(object)
 	if err != nil {
 		return nil, err
 	}
-	reply[b.srvPath(object)] = repoCode
+	reply[b.srvPath(object)] = srvCode
 
+	entCode, err := b.renderEntrance(object)
+	if err != nil {
+		return nil, err
+	}
+	reply[b.entPath()] = entCode
 	return reply, nil
 }
 
-func (b *service) dir(object *Object) string {
+func (b *service) dir() string {
 	return strings.ToLower(fmt.Sprintf("internal/service"))
 }
 
 func (b *service) srvPath(object *Object) string {
-	return b.dir(object) + "/" + toLowerCamelCase(object.Keyword) + ".go"
+	return b.dir() + "/" + toLowerCamelCase(object.Module) + ".go"
 }
 
-func (b *service) initPath(object *Object) string {
-	return b.dir(object) + "/service.go"
+func (b *service) entPath() string {
+	return b.dir() + "/entrance.go"
 }
 
 func (b *service) genSrvTplVariable(object *Object) map[string]any {
@@ -62,8 +70,8 @@ func (b *service) genSrvTplVariable(object *Object) map[string]any {
 	}
 }
 
-func (b *service) genSrv(object *Object) (*document, error) {
-	oldSrv := &document{Map: make(map[string]string)}
+func (b *service) genSrv(object *Object) (*serverSrv, error) {
+	oldSrv := &serverSrv{Map: make(map[string]string)}
 	byteData, err := os.ReadFile(b.srvPath(object))
 	if err == nil {
 		if res, err := b.scanSrv(string(byteData)); err == nil {
@@ -101,7 +109,7 @@ func (b *service) genSrv(object *Object) (*document, error) {
 	return oldSrv, nil
 }
 
-func (b *service) scanSrv(src string) (*document, error) {
+func (b *service) scanSrv(src string) (*serverSrv, error) {
 	nodeToString := func(fset *token.FileSet, node ast.Node) (string, error) {
 		var buf bytes.Buffer
 		if err := format.Node(&buf, fset, node); err != nil {
@@ -110,7 +118,7 @@ func (b *service) scanSrv(src string) (*document, error) {
 		return buf.String(), nil
 	}
 
-	doc := &document{Map: make(map[string]string)}
+	doc := &serverSrv{Map: make(map[string]string)}
 
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "", src, parser.ParseComments)
@@ -201,6 +209,29 @@ func (b *service) renderSrv(object *Object) (string, error) {
 	formattedCode, err := format.Source([]byte(sb.String()))
 	if err != nil {
 		return sb.String(), nil // Return the error if the code could not be formatted
+	}
+
+	return string(formattedCode), nil
+}
+
+func (b *service) renderEntrance(object *Object) (string, error) {
+	tp, err := os.ReadFile(srvEntrancePath)
+	if err != nil {
+		return "", err
+	}
+
+	buf := new(bytes.Buffer)
+	tmpl, err := template.New("go").Parse(strings.TrimSpace(string(tp)))
+	if err != nil {
+		return "", err
+	}
+	if err := tmpl.Execute(buf, b.genSrvTplVariable(object)); err != nil {
+		return "", err
+	}
+
+	formattedCode, err := format.Source(buf.Bytes())
+	if err != nil {
+		return buf.String(), nil // Return the error if the code could not be formatted
 	}
 
 	return string(formattedCode), nil

@@ -3,6 +3,7 @@ package autocode
 import (
 	"os"
 	"strings"
+	"unicode"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -24,6 +25,21 @@ func toLowerCamelCase(s string) string {
 
 func toLowerCase(s string) string {
 	return strings.ToLower(toUpperCamelCase(s))
+}
+
+func toSnake(s string) string {
+	runes := []rune(s)
+	length := len(runes)
+	var result []rune
+
+	for i, r := range runes {
+		if unicode.IsUpper(r) && i > 0 && ((i+1 < length && unicode.IsLower(runes[i+1])) || unicode.IsLower(runes[i-1])) {
+			result = append(result, '_')
+		}
+		result = append(result, unicode.ToLower(r))
+	}
+
+	return string(result)
 }
 
 func pluralize(word string) string {
@@ -88,4 +104,17 @@ func autoMkDir(fp string) {
 		return
 	}
 	_ = os.MkdirAll(fp, 0777)
+}
+
+type ListType interface {
+	~string | ~int | ~uint32 | ~[]byte | ~rune | ~float64
+}
+
+func inList[ListType comparable](list []ListType, val ListType) bool {
+	for _, v := range list {
+		if v == val {
+			return true
+		}
+	}
+	return false
 }

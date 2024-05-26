@@ -44,6 +44,7 @@ const (
 	_in      = "in"
 	_notIn   = "not in"
 	_between = "between"
+	_like    = "like"
 
 	_relationHasOne  = "hasOne"
 	_relationHasMany = "hasMany"

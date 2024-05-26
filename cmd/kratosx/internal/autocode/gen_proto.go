@@ -7,12 +7,14 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
-const (
-	protoMsgPath = "internal/autocode/template/proto/message.tpl"
-	protoSrvPath = "internal/autocode/template/proto/service.tpl"
-	protoErrPath = "internal/autocode/template/proto/error.tpl"
+var (
+	protoMsgPath = base.KratosxCliMod() + "/internal/autocode/template/proto/message.tpl"
+	protoSrvPath = base.KratosxCliMod() + "/internal/autocode/template/proto/service.tpl"
+	protoErrPath = base.KratosxCliMod() + "/internal/autocode/template/proto/error.tpl"
 )
 
 type proto struct {
@@ -85,6 +87,7 @@ func (p *proto) renderMsg(msg *protoMessageBody, prefixSpace string) string {
 	//	{{.CreateRequest}}
 	// }
 	text := fmt.Sprintf(prefixSpace+"message %s {\n", msg.Keyword)
+	oldText := text
 	for _, relation := range msg.Relations {
 		// 判断引用类型
 		pf := &protoMessageField{
@@ -96,16 +99,22 @@ func (p *proto) renderMsg(msg *protoMessageBody, prefixSpace string) string {
 			pf.Keyword = pluralize(pf.Keyword)
 			pf.Decorate = "repeated "
 		}
-		msg.Fields = append(msg.Fields, pf)
 
 		relationText := p.renderMsg(relation, prefixSpace+"  ")
-		text += relationText + "\n"
+		if relationText != "" {
+			msg.Fields = append(msg.Fields, pf)
+			text += relationText + "\n"
+		}
 	}
 
 	for index, field := range msg.Fields {
 		// uint32 field = number[(validate.rules).uint32 = {gt: 0}];
 		row := fmt.Sprintf(prefixSpace+"  %s%s %s = %d%s;\n", field.Decorate, field.Type, toLowerCamelCase(field.Keyword), index+1, field.Validate)
 		text += row
+	}
+
+	if text == oldText {
+		return ""
 	}
 
 	text += prefixSpace + "}"
@@ -117,22 +126,23 @@ func (p *proto) genCreateRequestMsg(object *Object) *protoMessageBody {
 	msg := &protoMessageBody{
 		Keyword: object.StructName(),
 	}
+
 	for _, field := range object.Fields {
-		if !field.Operation.Create {
-			continue
+		if field.Operation.Create {
+			tp := p.mapping[field.Type].Proto
+			pf := &protoMessageField{
+				Keyword:  field.Keyword,
+				Type:     tp,
+				Validate: p.ruleToString(tp, field.Rules),
+			}
+			if p.isOptional(field) {
+				pf.Decorate = "optional "
+			}
+			msg.Fields = append(msg.Fields, pf)
 		}
 
-		tp := p.mapping[field.Type].Proto
-		pf := &protoMessageField{
-			Keyword:  field.Keyword,
-			Type:     tp,
-			Validate: p.ruleToString(tp, field.Rules),
-		}
-		if p.isOptional(field) {
-			pf.Decorate = "optional "
-		}
-		msg.Fields = append(msg.Fields, pf)
 		if field.Relation != nil {
+			p.initObjectRules(field.Relation.Object)
 			pm := p.genCreateRequestMsg(field.Relation.Object)
 			msg.Relations = append(msg.Relations, pm)
 			msg.RelationType = field.Relation.Type
@@ -146,21 +156,21 @@ func (p *proto) genUpdateRequestMsg(object *Object) *protoMessageBody {
 		Keyword: object.StructName(),
 	}
 	for _, field := range object.Fields {
-		if !field.Operation.Update {
-			continue
+		if field.Operation.Update {
+			tp := p.mapping[field.Type].Proto
+			pf := &protoMessageField{
+				Keyword:  field.Keyword,
+				Type:     tp,
+				Validate: p.ruleToString(tp, field.Rules),
+			}
+			if p.isOptional(field) {
+				pf.Decorate = "optional "
+			}
+			msg.Fields = append(msg.Fields, pf)
 		}
 
-		tp := p.mapping[field.Type].Proto
-		pf := &protoMessageField{
-			Keyword:  field.Keyword,
-			Type:     tp,
-			Validate: p.ruleToString(tp, field.Rules),
-		}
-		if p.isOptional(field) {
-			pf.Decorate = "optional "
-		}
-		msg.Fields = append(msg.Fields, pf)
 		if field.Relation != nil {
+			p.initObjectRules(field.Relation.Object)
 			pm := p.genUpdateRequestMsg(field.Relation.Object)
 			msg.Relations = append(msg.Relations, pm)
 			msg.RelationType = field.Relation.Type
@@ -169,12 +179,42 @@ func (p *proto) genUpdateRequestMsg(object *Object) *protoMessageBody {
 	return msg
 }
 
-func (p *proto) genGetReplyMsg(object *Object) *protoMessageBody {
+func (p *proto) genGetRequestMsg(object *Object) *protoMessageBody {
+	msg := &protoMessageBody{
+		Keyword: object.StructName(),
+	}
+	var unique = map[string]bool{"Id": true}
+	for _, list := range object.Unique {
+		for _, item := range list {
+			unique[toUpperCamelCase(item)] = true
+		}
+	}
+	delete(unique, toUpperCamelCase("deleted_at"))
+	for _, field := range object.Fields {
+		if unique[toUpperCamelCase(field.Keyword)] {
+			tp := p.mapping[field.Type].Proto
+			pf := &protoMessageField{
+				Keyword:  field.Keyword,
+				Type:     tp,
+				Validate: p.ruleToString(tp, field.Rules),
+			}
+			pf.Decorate = "optional "
+			msg.Fields = append(msg.Fields, pf)
+		}
+	}
+	return msg
+}
+
+func (p *proto) genGetReplyMsg(object *Object, trash bool) *protoMessageBody {
 	msg := &protoMessageBody{
 		Keyword: object.StructName(),
 	}
 	for _, field := range object.Fields {
 		if !field.Operation.Get {
+			continue
+		}
+
+		if toUpperCamelCase(field.Keyword) == "DeletedAt" && !trash {
 			continue
 		}
 
@@ -188,7 +228,7 @@ func (p *proto) genGetReplyMsg(object *Object) *protoMessageBody {
 		}
 		msg.Fields = append(msg.Fields, pf)
 		if field.Relation != nil {
-			pm := p.genGetReplyMsg(field.Relation.Object)
+			pm := p.genGetReplyMsg(field.Relation.Object, trash)
 			msg.Relations = append(msg.Relations, pm)
 			msg.RelationType = field.Relation.Type
 		}
@@ -221,9 +261,12 @@ func (p *proto) genExportRequestMsg(object *Object) *protoMessageBody {
 	return msg
 }
 
-func (p *proto) genListRequestMsg(object *Object) *protoMessageBody {
+func (p *proto) genListRequestMsg(object *Object, trash bool) *protoMessageBody {
 	msg := &protoMessageBody{
 		Keyword: fmt.Sprintf("List%sRequest", object.StructName()),
+	}
+	if trash {
+		msg.Keyword = fmt.Sprintf("ListTrash%sRequest", object.StructName())
 	}
 	if object.Type == _objectTypeList {
 		msg.Fields = append(msg.Fields, []*protoMessageField{
@@ -274,13 +317,16 @@ func (p *proto) genListRequestMsg(object *Object) *protoMessageBody {
 	return msg
 }
 
-func (p *proto) genListReplyMsg(object *Object) *protoMessageBody {
+func (p *proto) genListReplyMsg(object *Object, trash bool) *protoMessageBody {
 	msg := &protoMessageBody{
 		Keyword: object.StructName(),
 	}
 
 	for _, field := range object.Fields {
 		if !field.Operation.List {
+			continue
+		}
+		if toUpperCamelCase(field.Keyword) == "DeletedAt" && !trash {
 			continue
 		}
 
@@ -294,7 +340,7 @@ func (p *proto) genListReplyMsg(object *Object) *protoMessageBody {
 		}
 		msg.Fields = append(msg.Fields, pf)
 		if field.Relation != nil {
-			pm := p.genListReplyMsg(field.Relation.Object)
+			pm := p.genListReplyMsg(field.Relation.Object, trash)
 			msg.Relations = append(msg.Relations, pm)
 			msg.RelationType = field.Relation.Type
 		}
@@ -393,7 +439,7 @@ func (p *proto) javaPackage(object *Object) string {
 
 func (p *proto) javaClass(object *Object) string {
 	s := strings.Split(p.dir(object)+"/"+p.version(), "/")
-	return toUpperCamelCase(object.Keyword) + toUpperCamelCase(s[len(s)-1])
+	return toUpperCamelCase(object.Module) + toUpperCamelCase(s[len(s)-1])
 }
 
 func (p *proto) objectName(object *Object) string {
@@ -448,11 +494,20 @@ func (p *proto) genMessage(object *Object) (*protoMessage, error) {
 	updateRequestMessage := p.genUpdateRequestMsg(object)
 	updateRequestMessage.Keyword = fmt.Sprintf("Update%sRequest", updateRequestMessage.Keyword)
 
-	getReplyMessage := p.genGetReplyMsg(object)
+	getRequestMessage := p.genGetRequestMsg(object)
+	getRequestMessage.Keyword = fmt.Sprintf("Get%sRequest", getRequestMessage.Keyword)
+
+	getReplyMessage := p.genGetReplyMsg(object, false)
 	getReplyMessage.Keyword = fmt.Sprintf("Get%sReply", getReplyMessage.Keyword)
 
-	listRequestMessage := p.genListRequestMsg(object)
-	listReplyMessage := p.genListReplyMsg(object)
+	getTrashReplyMessage := p.genGetReplyMsg(object, true)
+	getTrashReplyMessage.Keyword = fmt.Sprintf("GetTrash%sReply", getTrashReplyMessage.Keyword)
+
+	listRequestMessage := p.genListRequestMsg(object, false)
+	listTrashRequestMessage := p.genListRequestMsg(object, true)
+
+	listReplyMessage := p.genListReplyMsg(object, false)
+	listTrashReplyMessage := p.genListReplyMsg(object, true)
 	exportRequestMessage := p.genExportRequestMsg(object)
 
 	// 渲染模板
@@ -467,17 +522,21 @@ func (p *proto) genMessage(object *Object) (*protoMessage, error) {
 	}
 
 	renderData := map[string]any{
-		"Package":       p.packageName(object),
-		"GoPackage":     p.goPackage(object),
-		"JavaPackage":   p.javaPackage(object),
-		"JavaClass":     p.javaClass(object),
-		"Object":        p.objectName(object),
-		"CreateRequest": p.renderMsg(createRequestMessage, ""),
-		"ExportRequest": p.renderMsg(exportRequestMessage, ""),
-		"UpdateRequest": p.renderMsg(updateRequestMessage, ""),
-		"GetReply":      p.renderMsg(getReplyMessage, ""),
-		"ListReply":     p.renderMsg(listReplyMessage, "  "),
-		"ListRequest":   p.renderMsg(listRequestMessage, ""),
+		"Package":          p.packageName(object),
+		"GoPackage":        p.goPackage(object),
+		"JavaPackage":      p.javaPackage(object),
+		"JavaClass":        p.javaClass(object),
+		"Object":           p.objectName(object),
+		"CreateRequest":    p.renderMsg(createRequestMessage, ""),
+		"ExportRequest":    p.renderMsg(exportRequestMessage, ""),
+		"UpdateRequest":    p.renderMsg(updateRequestMessage, ""),
+		"GetRequest":       p.renderMsg(getRequestMessage, ""),
+		"GetReply":         p.renderMsg(getReplyMessage, ""),
+		"GetTrashReply":    p.renderMsg(getTrashReplyMessage, ""),
+		"ListRequest":      p.renderMsg(listRequestMessage, ""),
+		"ListReply":        p.renderMsg(listReplyMessage, "  "),
+		"ListTrashRequest": p.renderMsg(listTrashRequestMessage, ""),
+		"ListTrashReply":   p.renderMsg(listTrashReplyMessage, "  "),
 	}
 	if err := tmpl.Execute(buf, renderData); err != nil {
 		return nil, err
@@ -601,7 +660,7 @@ func (p *proto) genService(object *Object) (*protoService, error) {
 	}
 
 	srv.Imports = append(srv.Imports,
-		fmt.Sprintf("import \"%s\";", strings.ToLower(fmt.Sprintf("%s_%s.proto", object.ServerName(), object.Keyword))),
+		fmt.Sprintf("import \"%s\";", p.msgPath(object)),
 	)
 
 	tp, err := os.ReadFile(protoSrvPath)
@@ -616,15 +675,16 @@ func (p *proto) genService(object *Object) (*protoService, error) {
 	}
 
 	renderData := map[string]any{
-		"Package":         p.packageName(object),
-		"GoPackage":       p.goPackage(object),
-		"JavaPackage":     p.javaPackage(object),
-		"JavaClass":       p.javaClass(object),
-		"Object":          p.objectName(object),
-		"ObjectLowerCase": toLowerCamelCase(p.objectName(object)),
-		"ServerLowerCase": toLowerCamelCase(object.ServerName()),
-		"ModuleLowerCase": toLowerCamelCase(object.Module),
-		"Title":           p.objectComment(object),
+		"Package":                  p.packageName(object),
+		"GoPackage":                p.goPackage(object),
+		"JavaPackage":              p.javaPackage(object),
+		"JavaClass":                p.javaClass(object),
+		"Object":                   p.objectName(object),
+		"ObjectPluralizeLowerCase": pluralize(toSnake(p.objectName(object))),
+		"ObjectLowerCase":          toSnake(p.objectName(object)),
+		"ServerLowerCase":          toLowerCamelCase(object.ServerName()),
+		"ModuleLowerCase":          toLowerCamelCase(object.Module),
+		"Title":                    p.objectComment(object),
 	}
 
 	if err := tmpl.Execute(buf, renderData); err != nil {
