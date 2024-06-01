@@ -6,9 +6,14 @@ import (
 )
 {{end}}
 
-type {{.Object}} struct {
-{{.Fields}}
+{{ .Ents}}
+
+{{range $key,$val := .Ents}}
+type {{$key}} struct {
+{{$val}}
 }
+{{end}}
+
 {{if .IsTree}}
 // ID 获取菜单树ID
 func (m *{{.Object}}) ID() uint32 {

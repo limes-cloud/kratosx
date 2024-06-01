@@ -1,5 +1,9 @@
 package tree
 
+import (
+	"reflect"
+)
+
 type Tree interface {
 	ID() uint32
 	Parent() uint32
@@ -9,12 +13,14 @@ type Tree interface {
 
 func ToTree(src any) []Tree {
 	var ts []Tree
-	array, ok := src.([]any)
-	if !ok {
+	val := reflect.Value{}
+	if val.Kind() != reflect.Slice {
 		return ts
 	}
-	for _, item := range array {
-		if tr, ok := item.(Tree); ok {
+
+	for i := 0; i < val.Len(); i++ {
+		elem := val.Index(i)
+		if tr, ok := elem.Interface().(Tree); ok {
 			ts = append(ts, tr)
 		}
 	}

@@ -19,14 +19,14 @@ func NewUseCase(config *conf.Config, repo Repo) *UseCase {
 // Get{{.Object}} 获取指定的{{.Title}} 
 func (u *UseCase) Get{{.Object}}(ctx kratosx.Context, req *Get{{.Object}}Request) (*{{.Object}}, error) {
 	var (
-    	res *Dictionary
+    	res *{{.Object}}
     	err error
     )
 
     if req.Id != nil {
     	res, err = u.repo.Get{{.Object}}(ctx, *req.Id)
-    }else {{.GetCodes}} else{
-        err = errors.ParamsError()
+    }else {{.GetCodes}} {
+        return nil, errors.ParamsError()
     }
 
 
@@ -37,16 +37,21 @@ func (u *UseCase) Get{{.Object}}(ctx kratosx.Context, req *Get{{.Object}}Request
 }
 
 {{- if .IsTree}}
-// List{{.Object}} 获取{{.Title}} 列表树
+// List{{.Object}} 获取{{.Title}}列表树
 func (u *UseCase) List{{.Object}}(ctx kratosx.Context, req *List{{.Object}}Request) ([]tree.Tree, uint32, error) {
 	list, total, err := u.repo.List{{.Object}}(ctx, req)
 	if err != nil {
 		return nil, 0, errors.ListError(err.Error())
 	}
-	return tree.BuildArrayTree(tree.ToTree(list)), total, nil
+	var ts []tree.Tree
+    for _, item := range list {
+    	ts = append(ts, item)
+    }
+	return tree.BuildArrayTree(ts), total, nil
 }
 {{- else}}
-// List{{.Object}} 获取{{.Title}} 列表
+
+// List{{.Object}} 获取{{.Title}}列表
 func (u *UseCase) List{{.Object}}(ctx kratosx.Context, req *List{{.Object}}Request) ([]*{{.Object}}, uint32, error) {
 	list, total, err := u.repo.List{{.Object}}(ctx, req)
 	if err != nil {
@@ -57,8 +62,8 @@ func (u *UseCase) List{{.Object}}(ctx kratosx.Context, req *List{{.Object}}Reque
 {{- end}}
 
 // Create{{.Object}} 创建{{.Title}} 
-func (u *UseCase) Create{{.Object}}(ctx kratosx.Context, user *{{.Object}}) (uint32, error) {
-	id, err := u.repo.Create{{.Object}}(ctx, user)
+func (u *UseCase) Create{{.Object}}(ctx kratosx.Context, req *{{.Object}}) (uint32, error) {
+	id, err := u.repo.Create{{.Object}}(ctx, req)
 	if err != nil {
 		return 0, errors.CreateError(err.Error())
 	}
@@ -66,8 +71,8 @@ func (u *UseCase) Create{{.Object}}(ctx kratosx.Context, user *{{.Object}}) (uin
 }
 
 // Import{{.Object}} 导入{{.Title}} 
-func (u *UseCase) Import{{.Object}}(ctx kratosx.Context, users []*{{.Object}}) (uint32, error) {
-	total, err := u.repo.Import{{.Object}}(ctx, users)
+func (u *UseCase) Import{{.Object}}(ctx kratosx.Context, req []*{{.Object}}) (uint32, error) {
+	total, err := u.repo.Import{{.Object}}(ctx, req)
 	if err != nil {
 		return  0, errors.ImportError(err.Error())
 	}
@@ -84,8 +89,8 @@ func (u *UseCase) Export{{.Object}}(ctx kratosx.Context, req *Export{{.Object}}R
 }
 
 // Update{{.Object}} 更新{{.Title}} 
-func (u *UseCase) Update{{.Object}}(ctx kratosx.Context, user *{{.Object}}) error {
-	if err := u.repo.Update{{.Object}}(ctx, user); err != nil {
+func (u *UseCase) Update{{.Object}}(ctx kratosx.Context, req *{{.Object}}) error {
+	if err := u.repo.Update{{.Object}}(ctx, req); err != nil {
 		return errors.UpdateError(err.Error())
 	}
 	return nil
@@ -127,7 +132,8 @@ func (u *UseCase) ListTrash{{.Object}}(ctx kratosx.Context, req *List{{.Object}}
 	return tree.BuildArrayTree(tree.ToTree(list)), total, nil
 }
 {{- else}}
-// ListTrash{{.Object}} 获取{{.Title}} 列表
+
+// ListTrash{{.Object}} 获取{{.Title}}列表
 func (u *UseCase) ListTrash{{.Object}}(ctx kratosx.Context, req *ListTrash{{.Object}}Request) ([]*{{.Object}}, uint32, error) {
 	list, total, err := u.repo.ListTrash{{.Object}}(ctx, req)
 	if err != nil {

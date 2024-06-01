@@ -40,4 +40,10 @@ type Repo interface {
 
 	// RevertTrash{{.Object}} 还原{{.Title}}
 	RevertTrash{{.Object}}(ctx kratosx.Context, id uint32) error
+
+	// Get{{.Object}}ParentIds 获取父{{.Title}}ID列表
+	Get{{.Object}}ParentIds(ctx kratosx.Context, id uint32) ([]uint32, error)
+
+	// Get{{.Object}}ChildrenIds 获取子{{.Title}}ID列表
+    Get{{.Object}}ChildrenIds(ctx kratosx.Context, id uint32) ([]uint32, error)
 }

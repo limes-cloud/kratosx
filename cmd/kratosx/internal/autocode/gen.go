@@ -19,19 +19,20 @@ type Object struct {
 	Fields      []*Field   `json:"fields"`      // 所有字段
 	Methods     []string   `json:"methods"`     // 所有方法
 	Unique      [][]string `json:"unique"`
+	Index       [][]string `json:"index"`
 }
 
 type Field struct {
-	Keyword   string         `json:"keyword"`   // 字段key
-	Title     string         `json:"title"`     // 字段标题
-	IsOrder   bool           `json:"order"`     // 是否排序
-	Type      string         `json:"type"`      // 字段类型
-	Default   string         `json:"default"`   // 默认值
-	Required  bool           `json:"required"`  // 是否必填
-	Rules     map[string]any `json:"rules"`     // 校验规则
-	Operation FieldOperation `json:"operation"` // 操作
-	QueryType string         `json:"queryType"` // 查询方式
-	Relation  *FieldRelation `json:"relation"`  // 关联模型
+	Keyword   string           `json:"keyword"`   // 字段key
+	Title     string           `json:"title"`     // 字段标题
+	IsOrder   bool             `json:"order"`     // 是否排序
+	Type      string           `json:"type"`      // 字段类型
+	Default   string           `json:"default"`   // 默认值
+	Required  bool             `json:"required"`  // 是否必填
+	Rules     map[string]any   `json:"rules"`     // 校验规则
+	Operation FieldOperation   `json:"operation"` // 操作
+	QueryType string           `json:"queryType"` // 查询方式
+	Relations []*FieldRelation `json:"relations"` // 关联模型
 }
 
 type FieldOperation struct {
@@ -43,6 +44,7 @@ type FieldOperation struct {
 
 type FieldRelation struct {
 	Type   string
+	Rules  map[string]any
 	Object *Object
 }
 
@@ -126,6 +128,17 @@ func (o *Object) MethodStatus() map[string]bool {
 	mp := make(map[string]bool)
 	methods := []string{"Get", "List", "Create", "Import", "Export", "Update", "Delete",
 		"UpdateStatus", "ListTrash", "GetTrash", "ListTrash", "DeleteTrash", "RevertTrash"}
+
+	treeMethods := []string{
+		"Get" + toUpperCamelCase(o.Keyword) + "ChildrenIds",
+		"Get" + toUpperCamelCase(o.Keyword) + "ParentIds",
+		"append" + toUpperCamelCase(o.Keyword) + "Children",
+		"remove" + toUpperCamelCase(o.Keyword) + "Parent",
+	}
+	for _, tm := range treeMethods {
+		mp[tm] = o.Type == _objectTypeTree
+	}
+
 	for _, md := range methods {
 		if md == "UpdateStatus" {
 			mdName := "Update" + toUpperCamelCase(o.Keyword) + "Status"

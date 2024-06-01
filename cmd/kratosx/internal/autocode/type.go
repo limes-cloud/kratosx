@@ -48,6 +48,8 @@ const (
 
 	_relationHasOne  = "hasOne"
 	_relationHasMany = "hasMany"
+
+	_fixedCode = "fixed code"
 )
 
 var (
@@ -76,7 +78,7 @@ var (
 			Mapping: Mapping{
 				Struct: "string",
 				Proto:  "string",
-				DB:     "varchar(64) binary",
+				DB:     "varchar(64)",
 			},
 		},
 		{
@@ -85,7 +87,7 @@ var (
 			Mapping: Mapping{
 				Struct: "string",
 				Proto:  "string",
-				DB:     "varchar(128) binary",
+				DB:     "varchar(128)",
 			},
 		},
 		{
@@ -94,7 +96,7 @@ var (
 			Mapping: Mapping{
 				Struct: "string",
 				Proto:  "string",
-				DB:     "varchar(256) binary",
+				DB:     "varchar(256)",
 			},
 		},
 		{

@@ -40,6 +40,7 @@ type protoMessage struct {
 
 type protoMessageBody struct {
 	RelationType string
+	Rules        map[string]any
 	Keyword      string
 	Fields       []*protoMessageField
 	Relations    []*protoMessageBody
@@ -67,11 +68,25 @@ func GenProto(object *Object) (map[string]string, error) {
 	}
 	reply[p.msgPath(object)] = tempProtoMsg
 
+	// ts
+	if tp, tc, err := GenTypeScript(p.msgPath(object), tempProtoMsg); err != nil {
+		return nil, err
+	} else if tp != "" && tc != "" {
+		reply[tp] = tc
+	}
+
 	tempProtoSrv, err := p.renderTemplateProtoSrv(object)
 	if err != nil {
 		return nil, err
 	}
 	reply[p.srvPath(object)] = tempProtoSrv
+
+	// ts
+	if tp, tc, err := GenTypeScript(p.srvPath(object), tempProtoSrv); err != nil {
+		return nil, err
+	} else if tp != "" && tc != "" {
+		reply[tp] = tc
+	}
 
 	tempProtoErr, err := p.renderError(object)
 	if err != nil {
@@ -86,25 +101,35 @@ func (p *proto) renderMsg(msg *protoMessageBody, prefixSpace string) string {
 	// message Create{{.Object}}Request {
 	//	{{.CreateRequest}}
 	// }
+	set := map[string]bool{}
 	text := fmt.Sprintf(prefixSpace+"message %s {\n", msg.Keyword)
+
 	oldText := text
-	for _, relation := range msg.Relations {
+	for _, item := range msg.Relations {
+		relation := *item
+
 		// 判断引用类型
 		pf := &protoMessageField{
 			Decorate: "optional ",
 			Keyword:  toLowerCamelCase(relation.Keyword),
 			Type:     toUpperCamelCase(relation.Keyword),
 		}
-		if msg.RelationType == _relationHasMany {
+		pf.Validate = p.ruleToString("repeated", relation.Rules)
+		if relation.RelationType == _relationHasMany {
 			pf.Keyword = pluralize(pf.Keyword)
 			pf.Decorate = "repeated "
 		}
-
-		relationText := p.renderMsg(relation, prefixSpace+"  ")
-		if relationText != "" {
+		if !set[relation.Keyword] {
+			relationText := p.renderMsg(&relation, prefixSpace+"  ")
+			if relationText != "" {
+				msg.Fields = append(msg.Fields, pf)
+				text += relationText + "\n"
+				set[relation.Keyword] = true
+			}
+		} else {
 			msg.Fields = append(msg.Fields, pf)
-			text += relationText + "\n"
 		}
+
 	}
 
 	for index, field := range msg.Fields {
@@ -113,7 +138,7 @@ func (p *proto) renderMsg(msg *protoMessageBody, prefixSpace string) string {
 		text += row
 	}
 
-	if text == oldText {
+	if text == oldText && prefixSpace != "" {
 		return ""
 	}
 
@@ -141,11 +166,13 @@ func (p *proto) genCreateRequestMsg(object *Object) *protoMessageBody {
 			msg.Fields = append(msg.Fields, pf)
 		}
 
-		if field.Relation != nil {
-			p.initObjectRules(field.Relation.Object)
-			pm := p.genCreateRequestMsg(field.Relation.Object)
+		for _, item := range field.Relations {
+			relation := *item
+			p.initObjectRules(relation.Object)
+			pm := p.genCreateRequestMsg(relation.Object)
+			pm.RelationType = relation.Type
+			pm.Rules = relation.Rules
 			msg.Relations = append(msg.Relations, pm)
-			msg.RelationType = field.Relation.Type
 		}
 	}
 	return msg
@@ -155,7 +182,12 @@ func (p *proto) genUpdateRequestMsg(object *Object) *protoMessageBody {
 	msg := &protoMessageBody{
 		Keyword: object.StructName(),
 	}
+	md := object.MethodStatus()
+	usName := "Update" + toUpperCamelCase(object.Keyword) + "Status"
 	for _, field := range object.Fields {
+		if md[usName] && toUpperCamelCase(field.Keyword) == "Status" {
+			continue
+		}
 		if field.Operation.Update {
 			tp := p.mapping[field.Type].Proto
 			pf := &protoMessageField{
@@ -169,11 +201,13 @@ func (p *proto) genUpdateRequestMsg(object *Object) *protoMessageBody {
 			msg.Fields = append(msg.Fields, pf)
 		}
 
-		if field.Relation != nil {
-			p.initObjectRules(field.Relation.Object)
-			pm := p.genUpdateRequestMsg(field.Relation.Object)
+		for _, item := range field.Relations {
+			relation := *item
+			p.initObjectRules(relation.Object)
+			pm := p.genUpdateRequestMsg(relation.Object)
+			pm.RelationType = relation.Type
+			pm.Rules = relation.Rules
 			msg.Relations = append(msg.Relations, pm)
-			msg.RelationType = field.Relation.Type
 		}
 	}
 	return msg
@@ -227,10 +261,14 @@ func (p *proto) genGetReplyMsg(object *Object, trash bool) *protoMessageBody {
 			pf.Decorate = "optional "
 		}
 		msg.Fields = append(msg.Fields, pf)
-		if field.Relation != nil {
-			pm := p.genGetReplyMsg(field.Relation.Object, trash)
+
+		for _, item := range field.Relations {
+			relation := *item
+			p.initObjectRules(relation.Object)
+			pm := p.genGetReplyMsg(relation.Object, trash)
+			pm.RelationType = relation.Type
+			pm.Rules = relation.Rules
 			msg.Relations = append(msg.Relations, pm)
-			msg.RelationType = field.Relation.Type
 		}
 	}
 	return msg
@@ -253,6 +291,7 @@ func (p *proto) genExportRequestMsg(object *Object) *protoMessageBody {
 		switch strings.ToLower(field.QueryType) {
 		case _in, _notIn, _between:
 			pf.Decorate = "repeated "
+			pf.Keyword = pluralize(pf.Keyword)
 		default:
 			pf.Decorate = "optional "
 		}
@@ -283,6 +322,19 @@ func (p *proto) genListRequestMsg(object *Object, trash bool) *protoMessageBody 
 		}...)
 	}
 
+	var indexs = []string{`"id"`}
+	for _, arr := range object.Index {
+		if len(arr) == 0 {
+			continue
+		}
+		key := toSnake(arr[0])
+		if key == "deleted_at" {
+			continue
+		}
+		indexs = append(indexs, fmt.Sprintf(`"%s"`, key))
+	}
+	indexs = uniqueStrings(indexs)
+
 	msg.Fields = append(msg.Fields, []*protoMessageField{
 		{
 			Decorate: "optional ",
@@ -294,6 +346,7 @@ func (p *proto) genListRequestMsg(object *Object, trash bool) *protoMessageBody 
 			Decorate: "optional ",
 			Keyword:  "orderBy",
 			Type:     "string",
+			Validate: fmt.Sprintf("[(validate.rules).string = {in: [%s]}]", strings.Join(indexs, ",")),
 		},
 	}...)
 
@@ -309,6 +362,10 @@ func (p *proto) genListRequestMsg(object *Object, trash bool) *protoMessageBody 
 		switch strings.ToLower(field.QueryType) {
 		case _in, _notIn, _between:
 			pf.Decorate = "repeated "
+			pf.Keyword = pluralize(pf.Keyword)
+			//if strings.ToLower(field.QueryType) == _between {
+			//	pf.Validate = "[(validate.rules).repeated = {min_items: 2}]"
+			//}
 		default:
 			pf.Decorate = "optional "
 		}
@@ -339,10 +396,13 @@ func (p *proto) genListReplyMsg(object *Object, trash bool) *protoMessageBody {
 			pf.Decorate = "optional "
 		}
 		msg.Fields = append(msg.Fields, pf)
-		if field.Relation != nil {
-			pm := p.genListReplyMsg(field.Relation.Object, trash)
+		for _, item := range field.Relations {
+			relation := *item
+			p.initObjectRules(relation.Object)
+			pm := p.genListReplyMsg(relation.Object, trash)
+			pm.RelationType = relation.Type
+			pm.Rules = relation.Rules
 			msg.Relations = append(msg.Relations, pm)
-			msg.RelationType = field.Relation.Type
 		}
 	}
 
@@ -394,7 +454,25 @@ func (p *proto) ruleToString(tp string, rules map[string]any) string {
 			arr []string
 		)
 		for key, val := range rules {
-			arr = append(arr, key+": "+fmt.Sprint(val))
+			switch val.(type) {
+			case []any:
+				var valArr []string
+				list, _ := val.([]any)
+				for _, v := range list {
+					if _, ok := v.(string); ok {
+						valArr = append(valArr, fmt.Sprintf(`"%v"`, v))
+					} else {
+						valArr = append(valArr, fmt.Sprintf(`%v`, v))
+					}
+				}
+				rv := fmt.Sprintf("[%s]", strings.Join(valArr, ","))
+				arr = append(arr, key+": "+rv)
+			case string:
+				arr = append(arr, fmt.Sprintf(`%s: "%s"`, key, val))
+			default:
+				arr = append(arr, key+": "+fmt.Sprint(val))
+			}
+
 		}
 		return fmt.Sprintf(tpl, tp, strings.Join(arr, ","))
 	}
@@ -466,10 +544,10 @@ func (p *proto) scanMessage(content string) *protoMessage {
 		}
 	}
 
-	re := regexp.MustCompile(`message (\w+) \{([\s\S]*?)\n\}`)
+	re := regexp.MustCompile(`message (\w+)([\s]*?)\{([\s\S]*?)\n\}`)
 	matches := re.FindAllStringSubmatch(content, -1)
 	for _, match := range matches {
-		if len(match) == 3 { // 0 是整个匹配项，1 是消息名称，2 是消息体
+		if len(match) == 4 { // 0 是整个匹配项，1 是消息名称，2 是消息体
 			messageBody := match[0]
 			messageName := match[1]
 			reply.MessageSort = append(reply.MessageSort, messageName)
@@ -549,6 +627,9 @@ func (p *proto) genMessage(object *Object) (*protoMessage, error) {
 	msg.Options = append(msg.Options, newMsg.Options...)
 	msg.MessageSort = append(msg.MessageSort, newMsg.MessageSort...)
 	for key, val := range newMsg.MessageMap {
+		if oldVal := msg.MessageMap[key]; strings.Contains(oldVal, _fixedCode) {
+			continue
+		}
 		msg.MessageMap[key] = val
 	}
 
@@ -698,6 +779,9 @@ func (p *proto) genService(object *Object) (*protoService, error) {
 	srv.Options = append(srv.Options, newPrv.Options...)
 	srv.FunctionSort = append(srv.FunctionSort, newPrv.FunctionSort...)
 	for key, val := range newPrv.FunctionMap {
+		if oldVal := srv.FunctionMap[key]; strings.Contains(oldVal, _fixedCode) {
+			continue
+		}
 		srv.FunctionMap[key] = val
 	}
 
@@ -741,9 +825,11 @@ func (p *proto) genError(object *Object) (*protoError, error) {
 	oldError := &protoError{ErrorMap: make(map[string]string)}
 	byteData, err := os.ReadFile(p.errorPath(object))
 	if err == nil {
-		if res, err := p.scanError(string(byteData)); err == nil {
-			oldError = res
+		res, err := p.scanError(string(byteData))
+		if err != nil {
+			return nil, err
 		}
+		oldError = res
 	}
 
 	tp, err := os.ReadFile(protoErrPath)

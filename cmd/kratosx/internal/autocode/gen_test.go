@@ -82,9 +82,11 @@ func TestGen(t *testing.T) {
 					Get:    true,
 				},
 				QueryType: "=",
-				Relation: &FieldRelation{
-					Type:   _relationHasMany,
-					Object: classify,
+				Relations: []*FieldRelation{
+					{
+						Type:   _relationHasMany,
+						Object: classify,
+					},
 				},
 			},
 			{
@@ -134,13 +136,12 @@ func TestGen(t *testing.T) {
 }
 
 func TestGenJson(t *testing.T) {
-	data := []byte(`
-{
-  "table":"dictionary",
-  "keyword": "dictionary",
-  "module": "dictionary",
-  "comment": "字典目录",
-  "description": "字典目录",
+	data := []byte(`{
+  "table":"user",
+  "keyword": "user",
+  "module": "user",
+  "comment": "用户信息",
+  "description": "用户信息",
   "type": "list",
   "fields": [
     {
@@ -155,75 +156,353 @@ func TestGenJson(t *testing.T) {
         "list": true,
         "get": true
       },
-      "relation":{
-        "type": "hasMany",
-        "object": {
-          "table": "dictionary_value",
-          "keyword": "dictionary_value",
-          "module": "dictionary",
-          "comment": "字典值目录",
-          "description": "字典值目录",
-          "type": "list",
-          "fields": [
-            {
-              "keyword": "label",
-              "title": "标签",
-              "type": "varchar128",
-              "required": true,
-              "default": "",
-              "operation": {
-                "create": true,
-                "update": true,
-                "list": false,
-                "get": true
+      "relations":[
+        {
+          "type": "hasMany",
+          "rules": {"min_items": 1},
+          "object": {
+            "table":"user_job",
+            "keyword": "user_job",
+            "module": "job",
+            "comment": "用户职位信息",
+            "description": "用户职位信息",
+            "fields": [
+              {
+                "keyword": "job_id",
+                "title": "职位id",
+                "type": "foreignKey",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": true,
+                  "update": false,
+                  "list": false,
+                  "get": false
+                }
               }
-            },
-            {
-              "keyword": "value",
-              "title": "标识",
-              "type": "varchar64",
-              "required": true,
-              "default": "",
-              "operation": {
-                "create": true,
-                "update": true,
-                "list": false,
-                "get": true
+            ]
+          }
+        },
+        {
+          "type": "hasMany",
+          "rules": {"min_items": 1},
+          "object": {
+            "table":"user_role",
+            "keyword": "user_role",
+            "module": "role",
+            "comment": "用户角色信息",
+            "description": "用户角色信息",
+            "fields": [
+              {
+                "keyword": "role_id",
+                "title": "角色id",
+                "type": "foreignKey",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": true,
+                  "update": false,
+                  "list": false,
+                  "get": false
+                }
               }
-            },
-            {
-              "keyword": "type",
-              "title": "类型",
-              "type": "char",
-              "required": false,
-              "default": "",
-              "operation": {
-                "create": true,
-                "update": true,
-                "list": false,
-                "get": true
+            ]
+          }
+        },
+        {
+          "type": "hasMany",
+          "object": {
+            "table":"role",
+            "keyword": "role",
+            "module": "role",
+            "comment": "角色信息",
+            "description": "角色信息",
+            "fields": [
+              {
+                "keyword": "id",
+                "title": "主键",
+                "type": "primaryKey",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
+              },
+              {
+                "keyword": "name",
+                "title": "名称",
+                "type": "varchar64",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
+              },
+              {
+                "keyword": "keyword",
+                "title": "标识",
+                "type": "char",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
               }
-            },
-            {
-              "keyword": "extra",
-              "title": "扩展数据",
-              "type": "tinytext",
-              "required": false,
-              "default": "",
-              "operation": {
-                "create": true,
-                "update": true,
-                "list": false,
-                "get": true
+            ]
+          }
+        },
+        {
+          "type": "hasMany",
+          "object": {
+            "table":"job",
+            "keyword": "job",
+            "module": "job",
+            "comment": "职位信息",
+            "description": "职位信息",
+            "fields": [
+              {
+                "keyword": "id",
+                "title": "主键",
+                "type": "primaryKey",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
+              },
+              {
+                "keyword": "name",
+                "title": "名称",
+                "type": "varchar64",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
+              },
+              {
+                "keyword": "keyword",
+                "title": "标识",
+                "type": "char",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
               }
-            }
-          ]
+            ]
+          }
         }
+      ]
+    },
+    {
+      "keyword": "department_id",
+      "title": "部门id",
+      "type": "foreignKey",
+      "required": true,
+      "default": "",
+      "operation": {
+        "create": true,
+        "update": true,
+        "list": false,
+        "get": true
+      },
+      "queryType": "=",
+      "relations":[
+        {
+          "type": "hasOne",
+          "object": {
+            "table":"department",
+            "keyword": "department",
+            "module": "department",
+            "comment": "部门信息",
+            "description": "部门信息",
+            "fields": [
+              {
+                "keyword": "id",
+                "title": "主键",
+                "type": "primaryKey",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
+              },
+              {
+                "keyword": "name",
+                "title": "名称",
+                "type": "varchar64",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
+              },
+              {
+                "keyword": "keyword",
+                "title": "标识",
+                "type": "char",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "keyword": "role_id",
+      "title": "角色id",
+      "type": "foreignKey",
+      "required": true,
+      "default": "",
+      "operation": {
+        "create": false,
+        "update": false,
+        "list": false,
+        "get": true
+      },
+      "queryType": "=",
+      "relations": [
+        {
+          "type": "hasOne",
+          "object": {
+            "table":"role",
+            "keyword": "role",
+            "module": "role",
+            "comment": "角色信息",
+            "description": "角色信息",
+            "fields": [
+              {
+                "keyword": "id",
+                "title": "主键",
+                "type": "primaryKey",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": true
+                }
+              },
+              {
+                "keyword": "name",
+                "title": "名称",
+                "type": "varchar64",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": false
+                }
+              },
+              {
+                "keyword": "keyword",
+                "title": "标识",
+                "type": "char",
+                "required": true,
+                "default": "",
+                "operation": {
+                  "create": false,
+                  "update": false,
+                  "list": false,
+                  "get": false
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "keyword": "name",
+      "title": "姓名",
+      "type": "char",
+      "required": true,
+      "default": "",
+      "operation": {
+        "create": true,
+        "update": true,
+        "list": true,
+        "get": true
+      },
+      "queryType": "like"
+    },
+    {
+      "keyword": "nickname",
+      "title": "昵称",
+      "type": "varchar64",
+      "required": true,
+      "default": "",
+      "operation": {
+        "create": false,
+        "update": false,
+        "list": true,
+        "get": true
       }
     },
     {
-      "keyword": "keyword",
-      "title": "目录标识",
+      "keyword": "gender",
+      "title": "性别",
+      "type": "char",
+      "required": true,
+      "default": "",
+      "operation": {
+        "create": true,
+        "update": true,
+        "list": true,
+        "get": true
+      }
+    },
+    {
+      "keyword": "avatar",
+      "title": "头像",
+      "type": "varchar256",
+      "required": false,
+      "default": "",
+      "operation": {
+        "create": false,
+        "update": true,
+        "list": true,
+        "get": true
+      }
+    },
+    {
+      "keyword": "phone",
+      "title": "电话",
       "type": "char",
       "required": true,
       "default": "",
@@ -236,8 +515,8 @@ func TestGenJson(t *testing.T) {
       "queryType": "="
     },
     {
-      "keyword": "name",
-      "title": "目录名称",
+      "keyword": "email",
+      "title": "邮箱",
       "type": "varchar64",
       "required": true,
       "default": "",
@@ -246,17 +525,70 @@ func TestGenJson(t *testing.T) {
         "update": true,
         "list": true,
         "get": true
+      },
+      "queryType": "="
+    },
+    {
+      "keyword": "password",
+      "title": "密码",
+      "type": "char",
+      "required": true,
+      "default": "",
+      "operation": {
+        "create": false,
+        "update": false,
+        "list": false,
+        "get": false
       }
     },
     {
-      "keyword": "description",
-      "title": "目录描述",
-      "type": "varchar256",
+      "keyword": "status",
+      "title": "状态",
+      "type": "bool",
+      "required": true,
+      "default": "",
+      "operation": {
+        "create": false,
+        "update": true,
+        "list": true,
+        "get": true
+      }
+    },
+    {
+      "keyword": "setting",
+      "title": "用户设置",
+      "type": "tinytext",
       "required": false,
       "default": "",
       "operation": {
-        "create": true,
-        "update": true,
+        "create": false,
+        "update": false,
+        "list": false,
+        "get": true
+      }
+    },
+    {
+      "keyword": "token",
+      "title": "用户token",
+      "type": "tinytext",
+      "required": false,
+      "default": "",
+      "operation": {
+        "create": false,
+        "update": false,
+        "list": false,
+        "get": false
+      }
+    },
+    {
+      "keyword": "logged_at",
+      "title": "登陆时间",
+      "type": "time",
+      "required": true,
+      "default": "",
+      "operation": {
+        "create": false,
+        "update": false,
         "list": true,
         "get": true
       }
@@ -272,7 +604,8 @@ func TestGenJson(t *testing.T) {
         "update": false,
         "list": true,
         "get": true
-      }
+      },
+      "queryType": "between"
     },
     {
       "keyword": "updated_at",
@@ -286,25 +619,19 @@ func TestGenJson(t *testing.T) {
         "list": true,
         "get": true
       }
-    },
-    {
-      "keyword": "deleted_at",
-      "title": "删除时间",
-      "type": "time",
-      "required": true,
-      "default": "",
-      "operation": {
-        "create": false,
-        "update": false,
-        "list": true,
-        "get": true
-      }
     }
   ],
-"unique": [["keyword","deleted_at"]],
-  "methods": ["Get", "List", "Create", "Import", "Export", "Update", "Delete", "GetTrash", "ListTrash", "DeleteTrash", "RevertTrash"]
-}
-`)
+  "unique": [
+    ["phone"],
+    ["email"]
+  ],
+  "index": [
+    ["logged_at"],
+    ["created_at"],
+    ["updated_at"]
+  ],
+  "methods": ["Get","List", "Create", "Update","UpdateStatus", "Delete"]
+}`)
 	reply, err := GenByJson(data)
 	for path, text := range reply {
 		autoMkDir(path)

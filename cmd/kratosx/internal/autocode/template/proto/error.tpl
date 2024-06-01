@@ -8,7 +8,7 @@ option go_package = "./;errors";
 
 enum ErrorReason {
   // 设置缺省错误码
-  option (errors.default_code) = 500;
+  option (errors.default_code) = 400;
 
   ParamsError = 0[(errors.message)="参数错误"];
   DatabaseError = 0[(errors.message)="数据库错误"];

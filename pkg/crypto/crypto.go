@@ -19,7 +19,7 @@ func MD5ToUpper(in []byte) string {
 	return strings.ToUpper(MD5(in))
 }
 
-func ParsePwd(password string) string {
+func EncodePwd(password string) string {
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(hash)
 }

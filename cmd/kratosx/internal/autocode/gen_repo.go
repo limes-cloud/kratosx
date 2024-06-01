@@ -105,9 +105,10 @@ func (r *repo) genModelTplVariable(object *Object) map[string]any {
 			))
 		}
 
-		if field.Relation != nil {
-			obj := field.Relation.Object
-			if field.Relation.Type == _relationHasOne {
+		for _, item := range field.Relations {
+			relation := *item
+			obj := relation.Object
+			if relation.Type == _relationHasOne {
 				relations = append(relations, fmt.Sprintf("\t%s *%s `json:\"%s\"`",
 					toUpperCamelCase(obj.Keyword),
 					toUpperCamelCase(obj.Keyword),
@@ -121,6 +122,7 @@ func (r *repo) genModelTplVariable(object *Object) map[string]any {
 				))
 			}
 		}
+
 	}
 
 	fields = append(fields, relations...)
@@ -138,6 +140,7 @@ func (r *repo) genModelTplVariable(object *Object) map[string]any {
 		"Fields": strings.Join(fields, "\n"),
 		"Module": toLowerCase(object.Module),
 		"Object": toUpperCamelCase(object.Keyword),
+		"IsTree": object.Type == _objectTypeTree,
 	}
 }
 
@@ -145,9 +148,11 @@ func (r *repo) genModel(object *Object) (*repoModel, error) {
 	oldModel := &repoModel{ModelMap: make(map[string]string)}
 	byteData, err := os.ReadFile(r.modelPath(object))
 	if err == nil {
-		if res, err := r.scanModel(string(byteData)); err == nil {
-			oldModel = res
+		res, err := r.scanModel(string(byteData))
+		if err != nil {
+			return nil, err
 		}
+		oldModel = res
 	}
 
 	tp, err := os.ReadFile(repoModelPath)
@@ -170,6 +175,9 @@ func (r *repo) genModel(object *Object) (*repoModel, error) {
 	oldModel.Imports = append(oldModel.Imports, newModel.Imports...)
 	oldModel.ModelSort = append(oldModel.ModelSort, newModel.ModelSort...)
 	for key, val := range newModel.ModelMap {
+		if oldVal := oldModel.ModelMap[key]; strings.Contains(oldVal, _fixedCode) {
+			continue
+		}
 		oldModel.ModelMap[key] = val
 	}
 
@@ -288,8 +296,8 @@ func (r *repo) getDataPreload(rela *FieldRelation, prefix string) []string {
 		}
 		if field.Operation.Get {
 			preload = append(preload, fmt.Sprintf(`Preload("%s")`, prefix+relaKey))
-			if field.Relation != nil {
-				innerRelas = append(innerRelas, field.Relation)
+			if field.Relations != nil {
+				innerRelas = append(innerRelas, field.Relations...)
 			}
 		}
 	}
@@ -315,8 +323,8 @@ func (r *repo) listDataPreload(rela *FieldRelation, prefix string) []string {
 		}
 		if field.Operation.List {
 			preload = append(preload, fmt.Sprintf(`Preload("%s")`, prefix+relaKey))
-			if field.Relation != nil {
-				innerRelas = append(innerRelas, field.Relation)
+			if field.Relations != nil {
+				innerRelas = append(innerRelas, field.Relations...)
 			}
 		}
 	}
@@ -373,24 +381,31 @@ func (r *repo) genDataTplVariable(object *Object) map[string]any {
 			keys = append(keys, toUpperCamelCase(item))
 			where = append(where, fmt.Sprintf(`Where("%s = ?",%s)`, lowKey, lowKey))
 		}
-		byCodes = append(byCodes, byCodeType{
-			Params: strings.Join(params, ","),
-			Method: strings.Join(keys, "And"),
-			Where:  strings.Join(where, "."),
-		})
+		if len(keys) != 0 {
+			byCodes = append(byCodes, byCodeType{
+				Params: strings.Join(params, ","),
+				Method: strings.Join(keys, "And"),
+				Where:  strings.Join(where, "."),
+			})
+		}
 	}
 
+	var fieldLen = 0
 	for _, field := range object.Fields {
 		upKey := toUpperCamelCase(field.Keyword)
 		snakeKey := toSnake(field.Keyword)
-
+		if upKey != "DeletedAt" {
+			fieldLen++
+		}
 		if field.Operation.Get {
 			getTrashFields = append(getTrashFields, fmt.Sprintf(`"%s"`, snakeKey))
 			if upKey != "DeletedAt" {
 				getFields = append(getFields, fmt.Sprintf(`"%s"`, snakeKey))
 			}
-			if field.Relation != nil {
-				getPreload = append(getPreload, r.getDataPreload(field.Relation, "")...)
+			for _, item := range field.Relations {
+				relation := *item
+				getPreload = append(getPreload, r.getDataPreload(&relation, "")...)
+
 			}
 		}
 		if (field.Operation.Get) && upKey != "DeletedAt" {
@@ -398,29 +413,32 @@ func (r *repo) genDataTplVariable(object *Object) map[string]any {
 			if upKey != "DeletedAt" {
 				listFields = append(listFields, fmt.Sprintf(`"%s"`, snakeKey))
 			}
-			if field.Relation != nil {
-				listPreload = append(listPreload, r.listDataPreload(field.Relation, "")...)
+
+			for _, item := range field.Relations {
+				relation := *item
+				listPreload = append(listPreload, r.listDataPreload(&relation, "")...)
+
 			}
 
 			if field.QueryType != "" {
 				switch strings.ToLower(field.QueryType) {
 				case _in:
 					tpl := `if req.%s != nil {
-								db = db.Where("%s IN ?", *req.%s)
+								db = db.Where("%s IN ?", req.%s)
 							}`
 					code := fmt.Sprintf(tpl, pluralize(upKey), snakeKey, pluralize(upKey))
 					queryCodes = append(queryCodes, code)
 				case _notIn:
 					tpl := `if req.%s != nil {
-								db = db.Where("%s NOT IN ?", *req.%s)
+								db = db.Where("%s NOT IN ?", req.%s)
 							}`
 					code := fmt.Sprintf(tpl, pluralize(upKey), snakeKey, pluralize(upKey))
 					queryCodes = append(queryCodes, code)
 				case _between:
-					tpl := `if req.%s != nil {
-								db = db.Where("%s BETWEEN ? AND ?", *req.%s[0], *req.%s[1])
+					tpl := `if len(req.%s) == 2 {
+								db = db.Where("%s BETWEEN ? AND ?", req.%s[0], req.%s[1])
 							}`
-					code := fmt.Sprintf(tpl, pluralize(upKey), snakeKey, pluralize(upKey))
+					code := fmt.Sprintf(tpl, pluralize(upKey), snakeKey, pluralize(upKey), pluralize(upKey))
 					queryCodes = append(queryCodes, code)
 
 				case _like:
@@ -439,6 +457,12 @@ func (r *repo) genDataTplVariable(object *Object) map[string]any {
 			}
 		}
 	}
+	if len(getFields) == fieldLen {
+		getFields = []string{`"*"`}
+	}
+	if len(listFields) == fieldLen {
+		listFields = []string{`"*"`}
+	}
 
 	return map[string]any{
 		"ByCodes":         byCodes,
@@ -456,6 +480,7 @@ func (r *repo) genDataTplVariable(object *Object) map[string]any {
 		"HasListPreload":  len(listPreload) != 0,
 		"ListPreload":     strings.Join(listPreload, "."),
 		"QueryCodes":      strings.Join(queryCodes, "\n"),
+		"IsTree":          object.Type == _objectTypeTree,
 	}
 }
 
@@ -463,9 +488,11 @@ func (r *repo) genData(object *Object) (*repoData, error) {
 	oldData := &repoData{DataMap: make(map[string]string)}
 	byteData, err := os.ReadFile(r.dataPath(object))
 	if err == nil {
-		if res, err := r.scanData(string(byteData)); err == nil {
-			oldData = res
+		res, err := r.scanData(string(byteData))
+		if err != nil {
+			return nil, err
 		}
+		oldData = res
 	}
 
 	tp, err := os.ReadFile(repoDataPath)
@@ -488,6 +515,9 @@ func (r *repo) genData(object *Object) (*repoData, error) {
 	oldData.Imports = append(oldData.Imports, newData.Imports...)
 	oldData.DataSort = append(oldData.DataSort, newData.DataSort...)
 	for key, val := range newData.DataMap {
+		if oldVal := oldData.DataMap[key]; strings.Contains(oldVal, _fixedCode) {
+			continue
+		}
 		oldData.DataMap[key] = val
 	}
 
@@ -584,12 +614,20 @@ func (r *repo) renderData(object *Object) (string, error) {
 		if !ok {
 			continue // Skip if there is no definition for the type name
 		}
+
 		if !object.HasMethod(md, typeName) {
 			continue // Skip if there is no definition for the function name
 		}
+		upKey := toUpperCamelCase(object.Keyword)
+		if typeName == "Update"+upKey && !object.HasMethod(md, "Get"+upKey) {
+			if gteTypeDef, is := tps.DataMap["Get"+upKey]; is {
+				sb.WriteString(gteTypeDef)
+				sb.WriteString("\n\n")
+			}
+		}
 		// Write the type definition including comments
 		sb.WriteString(typeDef)
-		sb.WriteString("\n\n") // Add an extra line after each type for readability
+		sb.WriteString("\n\n")
 	}
 
 	formattedCode, err := format.Source([]byte(sb.String()))

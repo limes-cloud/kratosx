@@ -74,9 +74,12 @@ func (b *service) genSrv(object *Object) (*serverSrv, error) {
 	oldSrv := &serverSrv{Map: make(map[string]string)}
 	byteData, err := os.ReadFile(b.srvPath(object))
 	if err == nil {
-		if res, err := b.scanSrv(string(byteData)); err == nil {
-			oldSrv = res
+		res, err := b.scanSrv(string(byteData))
+		if err != nil {
+			return nil, err
 		}
+		oldSrv = res
+
 	}
 
 	tp, err := os.ReadFile(srvServicePath)
@@ -101,6 +104,9 @@ func (b *service) genSrv(object *Object) (*serverSrv, error) {
 	oldSrv.Imports = append(oldSrv.Imports, newSrv.Imports...)
 	oldSrv.Sort = append(oldSrv.Sort, newSrv.Sort...)
 	for key, val := range newSrv.Map {
+		if oldVal := oldSrv.Map[key]; strings.Contains(oldVal, _fixedCode) {
+			continue
+		}
 		oldSrv.Map[key] = val
 	}
 

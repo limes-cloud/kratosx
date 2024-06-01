@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
 // CmdAutoCode run project command.
@@ -49,8 +47,7 @@ func Run(cmd *cobra.Command, args []string) {
 		fmt.Println("🚫 path not exist")
 		return
 	}
-	fmt.Println(path)
-	fmt.Println(base.KratosxCliMod())
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Println("🚫 " + err.Error())
@@ -82,6 +79,7 @@ func Run(cmd *cobra.Command, args []string) {
 				fmt.Println("🚫 generate proto code error " + err.Error())
 			}
 		}
+
 	}
 	for _, p := range lastProto {
 		fd := exec.Command("kratosx", "proto", "client", p)

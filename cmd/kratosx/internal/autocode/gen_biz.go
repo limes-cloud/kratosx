@@ -119,9 +119,11 @@ func (b *biz) genRepo(object *Object) (*bizRepo, error) {
 	srv := &bizRepo{FunctionMap: make(map[string]string)}
 	byteData, err := os.ReadFile(b.repoPath(object))
 	if err == nil {
-		if res, err := b.scanRepo(string(byteData)); err == nil {
-			srv = res
+		res, err := b.scanRepo(string(byteData))
+		if err != nil {
+			return nil, err
 		}
+		srv = res
 	}
 
 	tp, err := os.ReadFile(bizRepoPath)
@@ -177,6 +179,9 @@ func (b *biz) genRepo(object *Object) (*bizRepo, error) {
 	srv.Imports = append(srv.Imports, newPrv.Imports...)
 	srv.FunctionSort = append(srv.FunctionSort, newPrv.FunctionSort...)
 	for key, val := range newPrv.FunctionMap {
+		if oldVal := srv.FunctionMap[key]; strings.Contains(oldVal, _fixedCode) {
+			continue
+		}
 		srv.FunctionMap[key] = val
 	}
 
@@ -367,9 +372,11 @@ func (b *biz) genTypes(object *Object) (*bizTypes, error) {
 	oldTypes := &bizTypes{TypesMap: make(map[string]string)}
 	byteData, err := os.ReadFile(b.typesPath(object))
 	if err == nil {
-		if res, err := b.scanTypes(string(byteData)); err == nil {
-			oldTypes = res
+		res, err := b.scanTypes(string(byteData))
+		if err != nil {
+			return nil, err
 		}
+		oldTypes = res
 	}
 
 	tp, err := os.ReadFile(bizTypesPath)
@@ -394,6 +401,9 @@ func (b *biz) genTypes(object *Object) (*bizTypes, error) {
 	oldTypes.Imports = append(oldTypes.Imports, newTypes.Imports...)
 	oldTypes.TypesSort = append(oldTypes.TypesSort, newTypes.TypesSort...)
 	for key, val := range newTypes.TypesMap {
+		if oldVal := oldTypes.TypesMap[key]; strings.Contains(oldVal, _fixedCode) {
+			continue
+		}
 		oldTypes.TypesMap[key] = val
 	}
 
@@ -505,10 +515,12 @@ func (b *biz) renderTypes(object *Object) (string, error) {
 	return string(formattedCode), nil
 }
 
-func (b *biz) genEntityTplVariable(object *Object) map[string]any {
+func (b *biz) genEntityStruct(object *Object) map[string]string {
 	var (
-		fields    []string
-		relations []string
+		fields          []string
+		relations       []string
+		relationObjects []*Object
+		ents            = make(map[string]string)
 	)
 	for _, field := range object.Fields {
 		tp := b.mapping[field.Type].Struct
@@ -523,9 +535,10 @@ func (b *biz) genEntityTplVariable(object *Object) map[string]any {
 			toLowerCamelCase(field.Keyword),
 		))
 
-		if field.Relation != nil {
-			obj := field.Relation.Object
-			if field.Relation.Type == _relationHasOne {
+		for _, item := range field.Relations {
+			obj := item.Object
+			relationObjects = append(relationObjects, obj)
+			if item.Type == _relationHasOne {
 				relations = append(relations, fmt.Sprintf("\t%s *%s `json:\"%s\"`",
 					toUpperCamelCase(obj.Keyword),
 					toUpperCamelCase(obj.Keyword),
@@ -540,11 +553,26 @@ func (b *biz) genEntityTplVariable(object *Object) map[string]any {
 			}
 		}
 	}
-
 	fields = append(fields, relations...)
+	if object.Type == _objectTypeTree {
+		fields = append(fields, fmt.Sprintf("\tChildren []*%s `json:\"Children\"`",
+			toUpperCamelCase(object.Keyword),
+		))
+	}
+	ents[toUpperCamelCase(object.Keyword)] = strings.Join(fields, "\n")
 
+	for _, rela := range relationObjects {
+		cents := b.genEntityStruct(rela)
+		for key, val := range cents {
+			ents[key] = val
+		}
+	}
+	return ents
+}
+func (b *biz) genEntityTplVariable(object *Object) map[string]any {
+	sc := b.genEntityStruct(object)
 	return map[string]any{
-		"Fields": strings.Join(fields, "\n"),
+		"Ents":   sc,
 		"Module": toLowerCase(object.Module),
 		"Object": toUpperCamelCase(object.Keyword),
 		"IsTree": object.Type == _objectTypeTree,
@@ -555,9 +583,12 @@ func (b *biz) genEntity(object *Object) (*bizEntity, error) {
 	oldEntity := &bizEntity{EntityMap: make(map[string]string)}
 	byteData, err := os.ReadFile(b.entityPath(object))
 	if err == nil {
-		if res, err := b.scanEntity(string(byteData)); err == nil {
-			oldEntity = res
+		res, err := b.scanEntity(string(byteData))
+		if err != nil {
+			return nil, err
 		}
+		oldEntity = res
+
 	}
 
 	tp, err := os.ReadFile(bizEntityPath)
@@ -582,6 +613,9 @@ func (b *biz) genEntity(object *Object) (*bizEntity, error) {
 	oldEntity.Imports = append(oldEntity.Imports, newEntity.Imports...)
 	oldEntity.EntitySort = append(oldEntity.EntitySort, newEntity.EntitySort...)
 	for key, val := range newEntity.EntityMap {
+		if oldVal := oldEntity.EntityMap[key]; strings.Contains(oldVal, _fixedCode) {
+			continue
+		}
 		oldEntity.EntityMap[key] = val
 	}
 
@@ -756,13 +790,19 @@ func (b *biz) genBizTplVariable(object *Object) map[string]any {
 			params = append(params, fmt.Sprintf("*req.%s", toUpperCamelCase(field.Keyword)))
 			keys = append(keys, toUpperCamelCase(item))
 		}
-		funcName := fmt.Sprintf("Get%sBy%s", toUpperCamelCase(object.Keyword), strings.Join(keys, "And"))
-		code := fmt.Sprintf(codeTpl, strings.Join(conds, " && "), funcName, strings.Join(params, ","))
-		getCodes = append(getCodes, code)
+		if len(keys) != 0 {
+			funcName := fmt.Sprintf("Get%sBy%s", toUpperCamelCase(object.Keyword), strings.Join(keys, "And"))
+			code := fmt.Sprintf(codeTpl, strings.Join(conds, " && "), funcName, strings.Join(params, ","))
+			getCodes = append(getCodes, code)
+		}
 	}
 
+	getCodesStr := strings.Join(getCodes, "else ")
+	if getCodesStr != "" {
+		getCodesStr = getCodesStr + " else "
+	}
 	return map[string]any{
-		"GetCodes":   strings.Join(getCodes, "else "),
+		"GetCodes":   getCodesStr,
 		"Server":     object.Server,
 		"ServerName": object.ServerName(),
 		"Module":     toLowerCase(object.Module),
@@ -776,9 +816,11 @@ func (b *biz) genBiz(object *Object) (*bizBiz, error) {
 	oldBiz := &bizBiz{BizMap: make(map[string]string)}
 	byteData, err := os.ReadFile(b.bizPath(object))
 	if err == nil {
-		if res, err := b.scanBiz(string(byteData)); err == nil {
-			oldBiz = res
+		res, err := b.scanBiz(string(byteData))
+		if err != nil {
+			return nil, err
 		}
+		oldBiz = res
 	}
 
 	tp, err := os.ReadFile(bizBizPath)
@@ -804,6 +846,9 @@ func (b *biz) genBiz(object *Object) (*bizBiz, error) {
 	oldBiz.Imports = append(oldBiz.Imports, newBiz.Imports...)
 	oldBiz.BizSort = append(oldBiz.BizSort, newBiz.BizSort...)
 	for key, val := range newBiz.BizMap {
+		if oldVal := oldBiz.BizMap[key]; strings.Contains(oldVal, _fixedCode) {
+			continue
+		}
 		oldBiz.BizMap[key] = val
 	}
 

@@ -2,12 +2,10 @@ package httpencoder
 
 import (
 	"fmt"
-	stdhttp "net/http"
-	"unsafe"
-
 	"github.com/go-kratos/kratos/v2/encoding"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/transport/http"
+	stdhttp "net/http"
 )
 
 // httpResponse 响应结构体
@@ -36,10 +34,9 @@ func encoderResponse() http.EncodeResponseFunc {
 		if err != nil {
 			return err
 		}
-		reply := fmt.Sprintf(tpl, *(*string)(unsafe.Pointer(&data)))
-
+		reply := fmt.Sprintf(tpl, string(data))
 		w.Header().Set("Content-Type", "application/json")
-		_, err = w.Write(*(*[]byte)(unsafe.Pointer(&reply)))
+		_, err = w.Write([]byte(reply))
 		if err != nil {
 			return err
 		}

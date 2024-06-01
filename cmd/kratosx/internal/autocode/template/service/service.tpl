@@ -41,6 +41,11 @@ func (s *{{.ModuleUpper}}Service) Get{{.Object}}(c context.Context, req *pb.Get{
     	ctx = kratosx.MustContext(c)
    )
 
+	if err := valx.Transform(req, &in); err != nil {
+		ctx.Logger().Warnw("msg", "req transform err", "err", err.Error())
+		return nil, errors.TransformError()
+	}
+
 	result, err := s.uc.Get{{.Object}}(ctx, &in)
 	if err != nil {
 		return nil, err
@@ -166,8 +171,8 @@ func (s *{{.ModuleUpper}}Service) Update{{.Object}}Status(c context.Context, req
 
 
 // Delete{{.Object}} 删除{{.Title}}
-func (s *{{.ModuleUpper}}Service) Delete{{.Object}}(ctx context.Context, req *pb.Delete{{.Object}}Request) (*pb.Delete{{.Object}}Reply, error) {
-	total, err := s.uc.Delete{{.Object}}(kratosx.MustContext(ctx), req.Ids)
+func (s *{{.ModuleUpper}}Service) Delete{{.Object}}(c context.Context, req *pb.Delete{{.Object}}Request) (*pb.Delete{{.Object}}Reply, error) {
+	total, err := s.uc.Delete{{.Object}}(kratosx.MustContext(c), req.Ids)
 	if err != nil {
 		return nil, err
 	}
