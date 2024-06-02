@@ -6,8 +6,6 @@ import (
 )
 {{end}}
 
-{{ .Ents}}
-
 {{range $key,$val := .Ents}}
 type {{$key}} struct {
 {{$val}}
