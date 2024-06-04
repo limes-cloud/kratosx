@@ -1,12 +1,12 @@
 package data
 
 import (
+    "fmt"
 	{{if .IsTree}} "errors" {{end}}
 
 	"github.com/limes-cloud/kratosx"
 	"github.com/limes-cloud/kratosx/pkg/valx"
 	"google.golang.org/protobuf/proto"
-	"gorm.io/gorm/clause"
 
 	biz "{{.Server}}/internal/biz/{{.Module}}"
 	"{{.Server}}/internal/data/model"
