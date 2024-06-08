@@ -3,6 +3,7 @@ package kratosx
 import (
 	"crypto/tls"
 
+	kmid "github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/go-kratos/kratos/v2/transport/http"
 
@@ -10,12 +11,13 @@ import (
 	"github.com/limes-cloud/kratosx/middleware"
 )
 
-func serverOptions(conf config.Config) ([]grpc.ServerOption, []http.ServerOption) {
+func serverOptions(conf config.Config, midOpts []kmid.Middleware) ([]grpc.ServerOption, []http.ServerOption) {
 	var gs []grpc.ServerOption
 	var hs []http.ServerOption
 
 	// 中间件
 	mds := middleware.New(conf)
+	mds = append(mds, midOpts...)
 	gs = append(gs, grpc.Middleware(mds...))
 	hs = append(hs, http.Middleware(mds...))
 

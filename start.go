@@ -69,7 +69,10 @@ func New(opts ...Option) *kratos.App {
 
 	// 必注册服务
 	if o.regSrvFn != nil {
-		gsOpts, hsOpts := serverOptions(o.config)
+		gsOpts, hsOpts := serverOptions(o.config, o.midOpts)
+		gsOpts = append(gsOpts, o.grpcSrvOptions...)
+		hsOpts = append(hsOpts, o.httpSrvOptions...)
+
 		srv := o.config.App().Server
 		gs := grpcServer(srv.Grpc, srv.Count, gsOpts)
 		hs := httpServer(srv.Http, srv.Count, hsOpts)
