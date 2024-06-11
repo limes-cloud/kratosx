@@ -10,6 +10,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlserver"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 
 	"github.com/limes-cloud/kratosx/config"
@@ -235,6 +236,8 @@ func (d *db) create(conf *config.Database) error {
 	if err != nil {
 		return err
 	}
-	_ = connect.Exec(fmt.Sprintf("CREATE DATABASE %s", conf.Connect.DBName))
+	_ = connect.Session(&gorm.Session{
+		Logger: logger.Default.LogMode(logger.Silent),
+	}).Exec(fmt.Sprintf("CREATE DATABASE %s", conf.Connect.DBName))
 	return nil
 }
