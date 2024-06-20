@@ -254,7 +254,7 @@ func (ep *ErrorPlugin) DuplicatedKey(db *gorm.DB, err *mysql.MySQLError) error {
 	// 替换value
 	format = strings.Replace(format, "{value}", parts[1], 1)
 
-	return errors.New(format)
+	return NewError(err, format)
 }
 
 // ForeignKey 处理创建引用错误
@@ -291,7 +291,7 @@ func (ep *ErrorPlugin) ForeignKey(db *gorm.DB, err *mysql.MySQLError, isCreate b
 	// 替换value
 	format = strings.Replace(format, "{value}", fmt.Sprint(value), 1)
 
-	return errors.New(format)
+	return NewError(err, format)
 }
 
 // func (ep *ErrorPlugin) findModelFieldValue(model any, field string) any {}

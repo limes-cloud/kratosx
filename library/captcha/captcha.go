@@ -11,10 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/mojocn/base64Captcha"
 
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/google/uuid"
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/email"
 	"github.com/limes-cloud/kratosx/library/redis"
@@ -23,7 +22,7 @@ import (
 type Captcha interface {
 	Email(tp string, ip string, to string) (Response, error)
 	Image(tp string, ip string) (Response, error)
-	VerifyEmail(tp, ip, id, answer string) error
+	VerifyEmail(tp, ip, id, answer, email string) error
 	VerifyImage(tp, ip, id, answer string) error
 }
 
@@ -32,7 +31,10 @@ type captcha struct {
 	set map[string]*config.Captcha
 }
 
-type Sender func(conf *config.Captcha, answer string, expire time.Duration) (string, error)
+type Sender struct {
+	UUID string
+	Send func(conf *config.Captcha, answer string, expire time.Duration) (string, error)
+}
 
 var instance *captcha
 
@@ -77,14 +79,17 @@ func (c *captcha) initFactory(name string, conf *config.Captcha) {
 
 func (c *captcha) Image(tp string, ip string) (Response, error) {
 	// 发送邮件
-	sender := func(conf *config.Captcha, answer string, expire time.Duration) (string, error) {
-		// 生成验证码对应图片的base64
-		dt := base64Captcha.NewDriverDigit(conf.Height, conf.Width, conf.Length, conf.Skew, conf.DotCount)
-		item, err := dt.DrawCaptcha(answer)
-		if err != nil {
-			return "", err
-		}
-		return item.EncodeB64string(), err
+	sender := Sender{
+		Send: func(conf *config.Captcha, answer string, expire time.Duration) (string, error) {
+			// 生成验证码对应图片的base64
+			dt := base64Captcha.NewDriverDigit(conf.Height, conf.Width, conf.Length, conf.Skew, conf.DotCount)
+			item, err := dt.DrawCaptcha(answer)
+			if err != nil {
+				return "", err
+			}
+			return item.EncodeB64string(), err
+		},
+		UUID: "",
 	}
 
 	return c.generate(tp, ip, imageType, sender)
@@ -92,12 +97,15 @@ func (c *captcha) Image(tp string, ip string) (Response, error) {
 
 func (c *captcha) Email(tp string, ip string, to string) (Response, error) {
 	// 发送邮件
-	sender := func(conf *config.Captcha, answer string, expire time.Duration) (string, error) {
-		err := email.Instance().Template(conf.Template).Send(to, "", map[string]any{
-			"captcha": answer,
-			"minute":  int(conf.Expire.Minutes()),
-		})
-		return "", err
+	sender := Sender{
+		Send: func(conf *config.Captcha, answer string, expire time.Duration) (string, error) {
+			err := email.Instance().Template(conf.Template).Send(to, "", map[string]any{
+				"captcha": answer,
+				"minute":  int(conf.Expire.Minutes()),
+			})
+			return "", err
+		},
+		UUID: to,
 	}
 
 	return c.generate(tp, ip, emailType, sender)
@@ -106,7 +114,7 @@ func (c *captcha) Email(tp string, ip string, to string) (Response, error) {
 func (c *captcha) generate(tp, ip, tpe string, sender Sender) (Response, error) {
 	conf, is := c.set[tp]
 	if !is {
-		return nil, errors.New(fmt.Sprintf("%s captcha not exist", tp))
+		return nil, fmt.Errorf("%s captcha not exist", tp)
 	}
 
 	// 获取验证码存储器
@@ -119,7 +127,7 @@ func (c *captcha) generate(tp, ip, tpe string, sender Sender) (Response, error) 
 	answer := c.randomCode(conf.Length)
 
 	// 获取当前用户的场景唯一id
-	clientKey := c.uid(tp, ip, tpe)
+	clientKey := c.clientUid(tp, ip, tpe)
 
 	countKey := fmt.Sprintf("%s_count", clientKey)
 
@@ -139,16 +147,13 @@ func (c *captcha) generate(tp, ip, tpe string, sender Sender) (Response, error) 
 	}
 
 	// 执行发送器
-	base64, err := sender(conf, answer, conf.Expire)
+	base64, err := sender.Send(conf, answer, conf.Expire)
 	if err != nil {
 		return nil, err
 	}
 
 	// 获取当前验证码验证码唯一id
-	uid := uuid.New().String()
-	if err := cache.Set(context.Background(), uid, answer, conf.Expire).Err(); err != nil {
-		return nil, err
-	}
+	uid := c.uid(clientKey, answer, sender.UUID)
 
 	// 将本次验证码挂载到当前的场景id上
 	if err := cache.Set(context.Background(), clientKey, uid, conf.Expire).Err(); err != nil {
@@ -171,19 +176,19 @@ func (c *captcha) generate(tp, ip, tpe string, sender Sender) (Response, error) 
 	}, nil
 }
 
-func (c *captcha) VerifyEmail(tp, ip, id, answer string) error {
-	return c.verify(tp, ip, emailType, id, answer)
+func (c *captcha) VerifyEmail(tp, ip, id, answer, email string) error {
+	return c.verify(tp, ip, emailType, id, answer, email)
 }
 
 func (c *captcha) VerifyImage(tp, ip, id, answer string) error {
-	return c.verify(tp, ip, imageType, id, answer)
+	return c.verify(tp, ip, imageType, id, answer, "")
 }
 
-func (c *captcha) verify(tp, ip, name, id, answer string) error {
+func (c *captcha) verify(tp, ip, name, id, answer, sender string) error {
 	// 获取指定模板的配置
 	conf, is := c.set[tp]
 	if !is {
-		return errors.New(fmt.Sprintf("%s captcha not exist", tp))
+		return fmt.Errorf("%s captcha not exist", tp)
 	}
 
 	// 获取验证码存储器
@@ -193,7 +198,8 @@ func (c *captcha) verify(tp, ip, name, id, answer string) error {
 	}
 
 	// 获取当前用户的场景唯一id
-	redisKey := c.uid(tp, ip, name)
+	redisKey := c.clientUid(tp, ip, name)
+	uid := c.uid(redisKey, answer, sender)
 
 	// 获取用户当前的验证码场景id
 	rid, err := cache.Get(context.Background(), redisKey).Result()
@@ -202,19 +208,19 @@ func (c *captcha) verify(tp, ip, name, id, answer string) error {
 	}
 
 	// 对比用户当前的验证码场景是否一致
-	if rid != id {
-		return errors.New(fmt.Sprintf("captcha id %s  not exist", id))
+	if rid != uid {
+		return fmt.Errorf("captcha id %s  not exist", id)
 	}
 
 	// 获取指定验证码id的答案
-	ans, err := cache.Get(context.Background(), id).Result()
-	if err != nil {
-		return err
-	}
-	// 对比答案是否一致
-	if ans != answer {
-		return errors.New("verify fail")
-	}
+	// ans, err := cache.Get(context.Background(), id).Result()
+	// if err != nil {
+	//	return err
+	// }
+	// // 对比答案是否一致
+	// if ans != answer {
+	//	return errors.New("verify fail")
+	// }
 
 	// 验证通过清除缓存
 	return cache.Del(context.Background(), rid, id).Err()
@@ -228,6 +234,11 @@ func (c *captcha) randomCode(len int) string {
 }
 
 // uid 获取唯一id
-func (c *captcha) uid(tp, ip, name string) string {
+func (c *captcha) clientUid(tp, ip, name string) string {
 	return fmt.Sprintf("captcha:%s:%s:%x", name, tp, md5.Sum([]byte(ip)))
+}
+
+// uid 获取唯一id
+func (c *captcha) uid(cid, ans, sender string) string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s:%s:%s", cid, ans, sender))))
 }
