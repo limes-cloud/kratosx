@@ -212,18 +212,8 @@ func (c *captcha) verify(tp, ip, name, id, answer, sender string) error {
 		return fmt.Errorf("captcha id %s  not exist", id)
 	}
 
-	// 获取指定验证码id的答案
-	// ans, err := cache.Get(context.Background(), id).Result()
-	// if err != nil {
-	//	return err
-	// }
-	// // 对比答案是否一致
-	// if ans != answer {
-	//	return errors.New("verify fail")
-	// }
-
 	// 验证通过清除缓存
-	return cache.Del(context.Background(), rid, id).Err()
+	return cache.Del(context.Background(), redisKey).Err()
 }
 
 // randomCode 生成随机数验证码

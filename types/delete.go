@@ -23,7 +23,7 @@ func (n *NullInt64) Scan(value any) error {
 // Value implements the driver Valuer interface.
 func (n NullInt64) Value() (driver.Value, error) {
 	if !n.Valid {
-		return nil, nil
+		return int64(0), nil
 	}
 	return n.Int64, nil
 }
