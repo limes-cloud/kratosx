@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -82,7 +83,7 @@ func (t *itr) Exec() error {
 		return err
 	}
 
-	str := string(byteData)
+	str := t.removeSQLComments(string(byteData))
 	str = strings.ReplaceAll(str, "BEGIN;", "")
 	str = strings.ReplaceAll(str, "COMMIT;", "")
 	str = strings.ReplaceAll(str, "COLLATE=utf8mb4_0900_ai_ci", "")
@@ -102,4 +103,23 @@ func (t *itr) Exec() error {
 	tx.Model(GormInit{}).Where("id=1").UpdateColumn("init", 1)
 	tx.Commit()
 	return nil
+}
+
+func (t *itr) removeSQLComments(sql string) string {
+	// 移除所有单行注释（以 -- 开头至行尾的部分）
+	singleLineCommentRegex := regexp.MustCompile(`(?m)--.*$`)
+	sql = singleLineCommentRegex.ReplaceAllString(sql, "")
+
+	// 移除所有多行注释（以 /* 开始直到 */ 的部分）
+	multiLineCommentRegex := regexp.MustCompile(`(?s)/\*.*?\*/`)
+	sql = multiLineCommentRegex.ReplaceAllString(sql, "")
+
+	// 移除多余的空白行
+	emptyLinesRegex := regexp.MustCompile(`(?m)^\s*$[\r\n]*`)
+	sql = emptyLinesRegex.ReplaceAllString(sql, "")
+
+	// 去除字符串首尾的空白字符
+	sql = strings.TrimSpace(sql)
+
+	return sql
 }
