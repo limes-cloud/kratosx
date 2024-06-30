@@ -27,6 +27,7 @@ type Request interface {
 	Put(url string, data any) (*response, error)
 	PutJson(url string, data any) (*response, error)
 	Delete(url string) (*response, error)
+	Do() (*response, error)
 }
 
 func NewDefault(logger *log.Helper) Request {
@@ -134,6 +135,13 @@ func (h *request) Delete(url string) (*response, error) {
 	res := &response{}
 	defer h.log(time.Now().UnixMilli(), res)
 	res.response, res.err = h.request.Delete(url)
+	return res, res.err
+}
+
+func (h *request) Do() (*response, error) {
+	res := &response{}
+	defer h.log(time.Now().UnixMilli(), res)
+	res.response, res.err = h.request.Send()
 	return res, res.err
 }
 
