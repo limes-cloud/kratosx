@@ -8,6 +8,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
+
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
@@ -51,6 +52,13 @@ func (p *Project) Add(ctx context.Context, dir string, layout string, branch str
 	if e != nil {
 		return e
 	}
+	e = os.Rename(
+		filepath.Join(to, "api", "layout"),
+		filepath.Join(to, "api", p.Name),
+	)
+	if e != nil {
+		return e
+	}
 
 	base.Tree(to, dir)
 
@@ -60,8 +68,8 @@ func (p *Project) Add(ctx context.Context, dir string, layout string, branch str
 	fmt.Println(color.WhiteString("$ cd %s", p.Name))
 	fmt.Println(color.WhiteString("$ go generate ./..."))
 	fmt.Println(color.WhiteString("$ go build -o ./bin/ ./... "))
-	fmt.Println(color.WhiteString("$ ./bin/%s -conf ./internal/conf/config.yaml\n", p.Name))
-	fmt.Println("			🤝 Thanks for using Kratosx")
-	fmt.Println("	📚 Tutorial: http://doc.qlime.cn")
+	fmt.Println(color.WhiteString("$ ./bin/%s -conf ./internal/conf/conf.yaml\n", p.Name))
+	fmt.Println("	🤝 Thanks for using Kratosx")
+	fmt.Println("	📚 Tutorial: http://docs.qlime.cn")
 	return nil
 }

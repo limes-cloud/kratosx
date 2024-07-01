@@ -28,6 +28,13 @@ type tsInterface struct {
 	m    map[string]string
 }
 
+type tsApi struct {
+	imports []string
+	sort    []string
+	types   []string
+	m       map[string]string
+}
+
 func GenTypeScript(path string, content string) (string, string, error) {
 	once.Do(func() {
 		t = &ts{store: make(map[string]*msg)}
@@ -38,7 +45,7 @@ func GenTypeScript(path string, content string) (string, string, error) {
 	}
 
 	if strings.HasSuffix(path, "service.proto") {
-		code, err := t.renderProtoApi(content)
+		code, err := t.renderProtoApi(path, content)
 		if err != nil {
 			return "", "", err
 		}
@@ -105,7 +112,7 @@ func (t *ts) generateTypeScript(path string, definition *proto3.Proto) string {
 		ti = t.scanMessage(string(oriByte))
 	}
 
-	//tsCode.WriteString("/* eslint-disable @typescript-eslint/no-empty-interface */\n")
+	// tsCode.WriteString("/* eslint-disable @typescript-eslint/no-empty-interface */\n")
 
 	proto3.Walk(definition,
 		proto3.WithMessage(func(m *proto3.Message) {
@@ -120,7 +127,7 @@ func (t *ts) generateTypeScript(path string, definition *proto3.Proto) string {
 	for _, k := range ti.sort {
 		tsCode.WriteString(ti.m[k] + "\n\n")
 	}
-	//t.store = append(t.store, ti.sort...)
+	// t.store = append(t.store, ti.sort...)
 	return tsCode.String()
 }
 
@@ -236,18 +243,62 @@ func (t *ts) getMapTypes(protoType string) (string, string) {
 	return "", ""
 }
 
+func (t *ts) scanApiMessage(tsCode string) tsApi {
+	api := tsApi{
+		imports: make([]string, 0),
+		sort:    make([]string, 0),
+		types:   make([]string, 0),
+		m:       make(map[string]string),
+	}
+
+	// Find imports
+	importRegex := regexp.MustCompile(`import (\{[^}]+\}|[^ ]+) from '([^']+)';`)
+	matches := importRegex.FindAllStringSubmatch(tsCode, -1)
+	for _, match := range matches {
+		if match[2] == "./type" {
+			re := regexp.MustCompile(`\{([^}]+)\}`)
+			mats := re.FindStringSubmatch(match[1])
+			if len(mats) < 2 {
+				continue
+			}
+			tps := strings.Split(mats[1], ",")
+			for _, val := range tps {
+				api.types = append(api.types, strings.TrimSpace(val))
+			}
+			continue
+		}
+		if match[2] == "axios" {
+			continue
+		}
+		api.imports = append(api.imports, match[0])
+	}
+
+	funcRegex := regexp.MustCompile(`// (.+)\nexport function (\w+)([\s]*?)\(([\s\S]*?)\n\}`)
+	matches = funcRegex.FindAllStringSubmatch(tsCode, -1)
+	for _, match := range matches {
+		funcName := match[2]
+		api.sort = append(api.sort, funcName)
+		api.m[funcName] = match[0]
+	}
+	return api
+}
+
 // generateAxiosTypescript 生成Axios请求的TypeScript代码
-func (t *ts) renderProtoApi(content string) (string, error) {
+func (t *ts) renderProtoApi(path, content string) (string, error) {
+	// 扫描历史代码
+	var (
+		api         tsApi
+		importTypes []string
+	)
+	if oriCode, err := os.ReadFile(t.apiPath(path)); err == nil {
+		api = t.scanApiMessage(string(oriCode))
+	}
+
 	parser := proto3.NewParser(strings.NewReader(content))
 	definition, err := parser.Parse()
 	if err != nil {
 		return "", err
 	}
-
-	var (
-		tsCode  strings.Builder
-		imports []string
-	)
 
 	proto3.Walk(definition,
 		proto3.WithService(func(s *proto3.Service) {
@@ -255,10 +306,17 @@ func (t *ts) renderProtoApi(content string) (string, error) {
 				if rpc, ok := e.(*proto3.RPC); ok {
 					methodName := rpc.Name // Capitalize the first letter
 					httpOption := t.getHttpOption(rpc)
+					tsCode := strings.Builder{}
 					comment := ""
+
 					if httpOption != nil {
 						requestType := rpc.RequestType
 						responseType := rpc.ReturnsType
+
+						if t.store[requestType] == nil && api.m[methodName] != "" {
+							continue
+						}
+
 						for _, cmt := range rpc.Comment.Lines {
 							comment = comment + "//" + cmt + "\n"
 						}
@@ -266,7 +324,7 @@ func (t *ts) renderProtoApi(content string) (string, error) {
 						if responseType == "google.protobuf.Empty" || respMsg == nil {
 							responseType = ""
 						} else {
-							imports = append(imports, responseType)
+							importTypes = append(importTypes, responseType)
 							responseType = fmt.Sprintf("<%s>", responseType)
 						}
 
@@ -274,7 +332,7 @@ func (t *ts) renderProtoApi(content string) (string, error) {
 						if requestType == "google.protobuf.Empty" || reqMsg == nil {
 							requestType = ""
 						} else {
-							imports = append(imports, requestType)
+							importTypes = append(importTypes, requestType)
 						}
 						tsCode.WriteString(comment)
 						// Generate TypeScript function
@@ -308,15 +366,46 @@ func (t *ts) renderProtoApi(content string) (string, error) {
 								tsCode.WriteString(fmt.Sprintf("    return axios.%s%s('%s', data);\n", httpOption.Verb, responseType, httpOption.Path))
 							}
 						}
-						tsCode.WriteString("}\n\n")
+						tsCode.WriteString("}")
+						api.sort = append(api.sort, methodName)
+						api.m[methodName] = tsCode.String()
 					}
 				}
 			}
 		}),
 	)
-	importTypes := "import axios from 'axios';\n"
-	importTypes = importTypes + fmt.Sprintf("import {\n\t%s\n} from './type';\n\n", strings.Join(uniqueStrings(imports), ",\n\t"))
-	return importTypes + tsCode.String(), nil
+	api.imports = append(api.imports, "import axios from 'axios';")
+	api.sort = uniqueStrings(api.sort)
+
+	api.types = append(api.types, importTypes...)
+	api.types = uniqueStrings(api.types)
+
+	api.imports = append(api.imports, fmt.Sprintf("import {\n\t%s\n} from './type';", strings.Join(api.types, ",\n\t")))
+
+	return t.apiToScript(api), nil
+}
+
+func (b *ts) apiToScript(api tsApi) string {
+	var (
+		sb strings.Builder
+	)
+
+	for _, ipt := range api.imports {
+		sb.WriteString(ipt + "\n")
+	}
+	sb.WriteString("\n")
+	// Write each type definition in the specified order
+	for _, typeName := range api.sort {
+		typeDef, ok := api.m[typeName]
+		if !ok {
+			continue // Skip if there is no definition for the type name
+		}
+
+		// Write the type definition including comments
+		sb.WriteString(typeDef)
+		sb.WriteString("\n\n") // Add an extra line after each type for readability
+	}
+	return sb.String()
 }
 
 type httpOption struct {

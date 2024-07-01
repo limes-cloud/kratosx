@@ -8,6 +8,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
+
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
@@ -48,6 +49,13 @@ func (p *Project) New(ctx context.Context, dir string, layout string, branch str
 	if e != nil {
 		return e
 	}
+	e = os.Rename(
+		filepath.Join(to, "api", "layout"),
+		filepath.Join(to, "api", p.Name),
+	)
+	if e != nil {
+		return e
+	}
 	base.Tree(to, dir)
 
 	fmt.Printf("\n🍺 Project creation succeeded %s\n", color.GreenString(p.Name))
@@ -57,7 +65,7 @@ func (p *Project) New(ctx context.Context, dir string, layout string, branch str
 	fmt.Println(color.WhiteString("$ go generate ./..."))
 	fmt.Println(color.WhiteString("$ go build -o ./bin/ ./... "))
 	fmt.Println(color.WhiteString("$ ./bin/%s -conf ./configs\n", p.Name))
-	fmt.Println("			🤝 Thanks for using Kratosx")
-	fmt.Println("	📚 Tutorial: http://doc.qlime.cn")
+	fmt.Println("	🤝 Thanks for using Kratosx")
+	fmt.Println("	📚 Tutorial: http://docs.qlime.cn")
 	return nil
 }
