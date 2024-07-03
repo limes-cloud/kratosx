@@ -287,7 +287,12 @@ func (t *ts) scanApiMessage(tsCode string) tsApi {
 func (t *ts) renderProtoApi(path, content string) (string, error) {
 	// 扫描历史代码
 	var (
-		api         tsApi
+		api = tsApi{
+			imports: make([]string, 0),
+			sort:    make([]string, 0),
+			types:   make([]string, 0),
+			m:       make(map[string]string),
+		}
 		importTypes []string
 	)
 	if oriCode, err := os.ReadFile(t.apiPath(path)); err == nil {
