@@ -15,19 +15,6 @@ func Transform(in any, dst any) error {
 	return json.Unmarshal(b, dst)
 }
 
-type ListType interface {
-	~string | ~int | ~uint32 | ~[]byte | ~rune | ~float64
-}
-
-func InList[ListType comparable](list []ListType, val ListType) bool {
-	for _, v := range list {
-		if v == val {
-			return true
-		}
-	}
-	return false
-}
-
 func IsEmail(email string) bool {
 	reg := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(.[a-zA-Z]{2,})+$`)
 	return reg.MatchString(email)
