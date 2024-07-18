@@ -3,7 +3,6 @@ package middleware
 import (
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/metadata"
-	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/middleware/validate"
 
 	"github.com/limes-cloud/kratosx/config"
@@ -14,7 +13,7 @@ func New(conf config.Config) []middleware.Middleware {
 	app := conf.App()
 
 	mds := []middleware.Middleware{
-		recovery.Recovery(),
+		Recovery(),
 		// 限流
 		RateLimit(app.RateLimit),
 		// 监控
