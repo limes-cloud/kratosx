@@ -98,6 +98,10 @@ func (c *ctx) Logger() *log.Helper {
 
 func (c *ctx) Transaction(fn func(ctx Context) error, name ...string) error {
 	dbi := db.Instance()
+	if _, ok := c.Value(dbi.TxKey(name...)).(*gorm.DB); ok {
+		return fn(MustContext(c.Ctx()))
+	}
+
 	return dbi.Get(name...).WithContext(c.Ctx()).Transaction(func(tx *gorm.DB) error {
 		cc := context.WithValue(c.Ctx(), dbi.TxKey(name...), tx)
 		return fn(MustContext(cc))
