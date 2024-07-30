@@ -1,15 +1,15 @@
 package tree
 
-type Tree interface {
+type Tree[T any] interface {
 	ID() uint32
 	Parent() uint32
-	AppendChildren(any)
-	ChildrenNode() []Tree
+	AppendChildren(T)
+	ChildrenNode() []T
 }
 
-func BuildArrayTree(array []Tree) []Tree {
+func BuildArrayTree[T Tree[T]](array []T) []T {
 	maxLen := len(array)
-	var rootArray []Tree
+	var rootArray []T
 	rootSet := FindRootSet(array)
 	for i := 0; i < maxLen; i++ {
 		count := 0
@@ -26,9 +26,9 @@ func BuildArrayTree(array []Tree) []Tree {
 	return rootArray
 }
 
-func BuildTree(array []Tree) Tree {
+func BuildTree[T Tree[T]](array []T) T {
 	maxLen := len(array)
-	var rootNode Tree = nil
+	var rootNode T
 	for i := 0; i < maxLen; i++ {
 		count := 0
 		for j := 0; j < maxLen; j++ {
@@ -44,9 +44,9 @@ func BuildTree(array []Tree) Tree {
 	return rootNode
 }
 
-func BuildTreeByID(array []Tree, id uint32) Tree {
+func BuildTreeByID[T Tree[T]](array []T, id uint32) T {
 	maxLen := len(array)
-	var rootNode Tree = nil
+	var rootNode T
 	for i := 0; i < maxLen; i++ {
 		count := 0
 		for j := 0; j < maxLen; j++ {
@@ -62,7 +62,7 @@ func BuildTreeByID(array []Tree, id uint32) Tree {
 	return rootNode
 }
 
-func getTreeID(t Tree, ids *[]uint32) {
+func getTreeID[T Tree[T]](t T, ids *[]uint32) {
 	if t == nil {
 		return
 	}
@@ -74,13 +74,13 @@ func getTreeID(t Tree, ids *[]uint32) {
 	}
 }
 
-func GetTreeID(tree Tree) []uint32 {
+func GetTreeID[T Tree[T]](tree T) []uint32 {
 	var ids []uint32
 	getTreeID(tree, &ids)
 	return ids
 }
 
-func FindRoots(array []Tree) []uint32 {
+func FindRoots[T Tree[T]](array []T) []uint32 {
 	idSet := make(map[uint32]bool)
 	for _, item := range array {
 		idSet[item.ID()] = true
@@ -101,7 +101,7 @@ func FindRoots(array []Tree) []uint32 {
 	return roots
 }
 
-func FindRootSet(array []Tree) map[uint32]bool {
+func FindRootSet[T Tree[T]](array []T) map[uint32]bool {
 	idSet := make(map[uint32]bool)
 	for _, item := range array {
 		idSet[item.ID()] = true

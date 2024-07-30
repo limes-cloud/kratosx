@@ -1,0 +1,60 @@
+{
+  "type": "list",
+  "module": "dictionary",
+  "name": "dictionary",
+  "struct": "dictionary",
+  "comment": "字典信息",
+  "columns": [
+    {
+      "name": "id",
+      "type": "bigint",
+      "size": 20,
+      "comment": "自增id",
+      "collation": "",
+      "is_null": false,
+      "default": "",
+      "unsigned": true,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "keyword",
+      "type": "char",
+      "size": 32,
+      "comment": "关键词",
+      "collation": "",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "description",
+      "type": "varchar",
+      "size": 250,
+      "comment": "描述",
+      "collation": "",
+      "is_null": true,
+      "default": "",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    }
+  ]
+}
