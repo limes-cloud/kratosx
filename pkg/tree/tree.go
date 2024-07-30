@@ -63,10 +63,6 @@ func BuildTreeByID[T Tree[T]](array []T, id uint32) T {
 }
 
 func getTreeID[T Tree[T]](t T, ids *[]uint32) {
-	if t == nil {
-		return
-	}
-
 	*ids = append(*ids, t.ID())
 
 	for _, item := range t.ChildrenNode() {
