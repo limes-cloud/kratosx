@@ -5,9 +5,10 @@ package errors;
 import "errors/errors.proto";
 option go_package = "./;errors";
 
+
 enum ErrorReason {
   // 设置缺省错误码
-  option (errors.default_code) = 500;
+  option (errors.default_code) = 400;
 
   ParamsError = 0[(errors.message)="参数错误"];
   DatabaseError = 1[(errors.message)="数据库错误"];
@@ -23,32 +24,4 @@ enum ErrorReason {
   ListTrashError = 11[(errors.message)="获取回收站列表数据失败"];
   DeleteTrashError = 12[(errors.message)="删除回收站数据失败"];
   RevertTrashError = 13[(errors.message)="还原回收站数据失败"];
-  ResourceServerError = 14[(errors.message)="资源服务异常"];
-  ForbiddenError = 15[(errors.code)=403,(errors.message)="无应用权限"];
-  SystemError = 16[(errors.message)="系统错误"];
-  GenCaptchaError = 17[(errors.message)="验证码生成失败"];
-  NotExistEmailError = 18[(errors.message)="不存在此邮箱"];
-  GenCaptchaTypeError = 19[(errors.message)="错误的验证码类型"];
-  VerifyCaptchaError = 20[(errors.message)="验证码验证失败"];
-  OAuthLoginError = 21[(errors.message)="三方授权登陆失败"];
-  NotUserError = 22[(errors.message)="用户不存在"];
-  NotAppScopeError = 23[(errors.message)="用户无应用权限"];
-  RsaDecodeError = 24[(errors.message)="rsa解密失败"];
-  PasswordFormatError = 25[(errors.message)="密码格式错误"];
-  PasswordExpireError = 26[(errors.message)="密码已过期"];
-  PasswordError = 27[(errors.message)="账户或密码错误"];
-  UserDisableError = 28[(errors.message)="用户已被禁用"];
-  GenTokenError = 29[(errors.message)="token生成失败"];
-  ParseTokenError = 30[(errors.message)="token解析失败"];
-  RefreshTokenError = 31[(errors.code)=401,(errors.message)="刷新token失败"];
-  DisableRegisterError = 32[(errors.code)=401,(errors.message)="应用已关闭注册权限"];
-  AlreadyExistEmailError = 33[(errors.message)="邮箱已存在"];
-  AlreadyExistUsernameError = 34[(errors.message)="账号已存在"];
-  RegisterError = 35[(errors.message)="用户注册失败"];
-  BindError = 36[(errors.message)="用户注册失败"];
-  LoginError = 37[(errors.message)="登陆失败"];
-  ExistFeedbackError = 38[(errors.message)="已存在重复的反馈内容"];
-  ManagerServerError = 39[(errors.message)="管理中心服务异常"];
-  NotPermissionError = 40[(errors.message)="无资源权限"];
-  AlreadyBindError = 41[(errors.message)="该账号已绑定过其他平台，不能重复绑定"];
 }

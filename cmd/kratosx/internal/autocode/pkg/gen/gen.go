@@ -1,5 +1,0 @@
-package gen
-
-func GenByJson() {
-
-}

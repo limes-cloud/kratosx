@@ -1,0 +1,220 @@
+{
+  "type": "list",
+  "module": "dictionary",
+  "name": "dictionary",
+  "struct": "dictionary",
+  "comment": "字典信息",
+  "enableBatchDelete": true,
+  "columns": [
+    {
+      "name": "id",
+      "type": "bigint",
+      "comment": "自增id",
+      "collation": "",
+      "is_null": false,
+      "default": "",
+      "unsigned": true,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "user_id",
+      "type": "bigint",
+      "comment": "用户id",
+      "is_null": false,
+      "default": "",
+      "unsigned": true,
+      "rules": {
+        "gte": 1
+      },
+      "relations": [
+        {
+          "column": "id",
+          "type": "many",
+          "table": {
+            "type": "list",
+            "module": "user",
+            "name": "user",
+            "struct": "user",
+            "comment": "用户信息",
+            "columns":[
+              {
+                "name": "id",
+                "type": "bigint",
+                "comment": "自增id",
+                "collation": "",
+                "is_null": false,
+                "default": "",
+                "unsigned": true,
+                "relations": [],
+                "operation": {
+                  "get": true,
+                  "list": true,
+                  "update": true,
+                  "create": true
+                }
+              },
+              {
+                "name": "name",
+                "type": "varchar",
+                "size": "15",
+                "comment": "姓名",
+                "collation": "",
+                "is_null": false,
+                "default": "",
+                "unsigned": false,
+                "relations": [],
+                "operation": {
+                  "get": true,
+                  "list": true,
+                  "update": true,
+                  "create": true
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "keyword",
+      "type": "char",
+      "size": "32",
+      "comment": "关键词",
+      "collation": "utf8mb4_bin",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
+      "query": {
+        "type": "="
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "binary",
+      "type": "char",
+      "size": "32",
+      "comment": "二进制",
+      "collation": "utf8mb4_bin",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
+      "query": {
+        "type": "="
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "description",
+      "type": "varchar",
+      "size": "250",
+      "comment": "描述",
+      "collation": "",
+      "is_null": true,
+      "default": "",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "created_at",
+      "type": "bigint",
+      "comment": "创建时间",
+      "collation": "",
+      "is_null": false,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": false,
+        "create": false
+      }
+    },
+    {
+      "name": "updated_at",
+      "type": "bigint",
+      "comment": "更新时间",
+      "collation": "",
+      "is_null": false,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": false,
+        "create": false
+      }
+    },
+    {
+      "name": "deleted_at",
+      "type": "bigint",
+      "comment": "删除时间",
+      "collation": "",
+      "is_null": false,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": false,
+        "create": false
+      }
+    }
+  ],
+  "indexes": [
+    {
+      "unique": true,
+      "names": ["binary","keyword","deleted_at"]
+    },
+    {
+      "unique": false,
+      "names": ["created_at"]
+    },
+    {
+      "unique": false,
+      "names": ["updated_at"]
+    },
+    {
+      "unique": false,
+      "names": ["deleted_at"]
+    }
+  ]
+}

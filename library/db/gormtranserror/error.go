@@ -1,13 +1,22 @@
 package gormtranserror
 
-import "errors"
+import (
+	"errors"
+	"gorm.io/gorm"
+)
 
 type GormError struct {
 	oriError error
 	e        string
 }
 
-func NewError(ori error, text string) error {
+func NewError(db *gorm.DB, ori error, text string) error {
+	if errTranslator, ok := db.Dialector.(gorm.ErrorTranslator); ok {
+		return &GormError{
+			oriError: errTranslator.Translate(ori),
+			e:        text,
+		}
+	}
 	return &GormError{
 		oriError: ori,
 		e:        text,
@@ -25,7 +34,7 @@ func Is(src, dst error) bool {
 		return errors.Is(_dst.oriError, src)
 	}
 
-	return errors.Is(src, src)
+	return errors.Is(src, dst)
 }
 
 func (ge *GormError) Error() string {
