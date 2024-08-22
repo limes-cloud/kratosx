@@ -1,0 +1,219 @@
+{
+  "type": "list",
+  "module": "information",
+  "name": "information",
+  "struct": "information",
+  "comment": "咨询信息",
+  "enableBatchDelete": false,
+  "columns": [
+    {
+      "name": "id",
+      "type": "bigint",
+      "comment": "自增id",
+      "collation": "",
+      "is_null": false,
+      "default": "",
+      "unsigned": true,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": false
+      }
+    },
+    {
+      "name": "title",
+      "type": "varchar",
+      "size": "128",
+      "comment": "咨询标题",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1,
+        "max_len": 40
+      },
+      "query": {
+        "type": "like"
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "description",
+      "type": "varchar",
+      "size": "128",
+      "comment": "咨询简介",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "cover",
+      "type": "varchar",
+      "size": "128",
+      "comment": "咨询封面",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "unit",
+      "type": "varchar",
+      "size": "128",
+      "comment": "发布单位",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "content",
+      "type": "longtext",
+      "size": "128",
+      "comment": "咨询内容",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": false,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "is_top",
+      "type": "tinyint",
+      "size": "1",
+      "comment": "是否置顶",
+      "collation": "",
+      "is_null": true,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "query": {
+        "type": "="
+      },
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "status",
+      "type": "bool",
+      "size": "1",
+      "comment": "咨询状态",
+      "collation": "",
+      "is_null": true,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "query": {
+        "type": "="
+      },
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "read",
+      "type": "bigint",
+      "comment": "阅读人数",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "created_at",
+      "type": "bigint",
+      "comment": "创建时间",
+      "collation": "",
+      "is_null": false,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": false,
+        "create": false
+      }
+    },
+    {
+      "name": "updated_at",
+      "type": "bigint",
+      "comment": "更新时间",
+      "collation": "",
+      "is_null": false,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": false,
+        "create": false
+      }
+    }
+  ],
+  "indexes": [
+    {
+      "unique": false,
+      "names": ["created_at"]
+    },
+    {
+      "unique": false,
+      "names": ["updated_at"]
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 package initializer
 
 import (
+	"bufio"
 	"errors"
-	"io"
+	"gorm.io/gorm/clause"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -77,49 +77,45 @@ func (t *itr) Exec() error {
 	if err != nil {
 		return errors.New("open sql file error " + err.Error())
 	}
+	defer file.Close()
 
-	byteData, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
+	var (
+		sb      strings.Builder
+		scanner = bufio.NewScanner(file)
+		tx      = t.db.Begin()
+	)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
 
-	str := t.removeSQLComments(string(byteData))
-	str = strings.ReplaceAll(str, "BEGIN;", "")
-	str = strings.ReplaceAll(str, "COMMIT;", "")
-	str = strings.ReplaceAll(str, "COLLATE=utf8mb4_0900_ai_ci", "")
-
-	tx := t.db.Begin()
-	sqlList := strings.Split(str, ";\n")
-	for _, item := range sqlList {
-		sql := strings.TrimSpace(item)
-		if sql == "" {
+		// 忽略事物
+		if line == "BEGIN;" || line == "COMMIT;" {
 			continue
 		}
-		if err := tx.Exec(sql + ";").Error; err != nil {
-			tx.Rollback()
-			return err
+		// 如果是注释或空行则跳过
+		if strings.HasPrefix(line, "--") || strings.HasPrefix(line, "/*") || len(strings.TrimSpace(line)) == 0 {
+			continue
+		}
+		// 替换默认字符集
+		line = strings.ReplaceAll(line, "COLLATE=utf8mb4_0900_ai_ci", "")
+
+		sb.WriteString(line)
+
+		// 如果SQL语句以分号结尾，则执行
+		if strings.HasSuffix(line, ";") {
+			sql := sb.String()
+			sb.Reset()
+
+			if strings.Contains(sql, "gorm_init") {
+				continue
+			}
+
+			if err = tx.Exec(sql).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
 		}
 	}
-	tx.Model(GormInit{}).Where("id=1").UpdateColumn("init", 1)
+	tx.Clauses(clause.OnConflict{UpdateAll: true}).Create(GormInit{Id: 1, Init: true})
 	tx.Commit()
 	return nil
-}
-
-func (t *itr) removeSQLComments(sql string) string {
-	// 移除所有单行注释（以 -- 开头至行尾的部分）
-	singleLineCommentRegex := regexp.MustCompile(`(?m)--.*$`)
-	sql = singleLineCommentRegex.ReplaceAllString(sql, "")
-
-	// 移除所有多行注释（以 /* 开始直到 */ 的部分）
-	multiLineCommentRegex := regexp.MustCompile(`(?s)/\*.*?\*/`)
-	sql = multiLineCommentRegex.ReplaceAllString(sql, "")
-
-	// 移除多余的空白行
-	emptyLinesRegex := regexp.MustCompile(`(?m)^\s*$[\r\n]*`)
-	sql = emptyLinesRegex.ReplaceAllString(sql, "")
-
-	// 去除字符串首尾的空白字符
-	sql = strings.TrimSpace(sql)
-
-	return sql
 }

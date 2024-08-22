@@ -1,0 +1,167 @@
+{
+  "type": "list",
+  "module": "banner",
+  "name": "banner",
+  "struct": "banner",
+  "comment": "轮播图信息",
+  "enableBatchDelete": false,
+  "columns": [
+    {
+      "name": "id",
+      "type": "bigint",
+      "comment": "自增id",
+      "collation": "",
+      "is_null": false,
+      "default": "",
+      "unsigned": true,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": false
+      }
+    },
+    {
+      "name": "title",
+      "type": "varchar",
+      "size": "128",
+      "comment": "轮播标题",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1,
+        "max_len": 40
+      },
+      "query": {
+        "type": "like"
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "src",
+      "type": "varchar",
+      "size": "128",
+      "comment": "轮播url",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "path",
+      "type": "varchar",
+      "size": "128",
+      "comment": "跳转路径",
+      "is_null": true,
+      "default": "",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "weight",
+      "type": "tinyint",
+      "size": "",
+      "comment": "权重",
+      "collation": "",
+      "is_null": true,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "status",
+      "type": "bool",
+      "size": "1",
+      "comment": "状态",
+      "collation": "",
+      "is_null": true,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "query": {
+        "type": "="
+      },
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "created_at",
+      "type": "bigint",
+      "comment": "创建时间",
+      "collation": "",
+      "is_null": false,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": false,
+        "create": false
+      }
+    },
+    {
+      "name": "updated_at",
+      "type": "bigint",
+      "comment": "更新时间",
+      "collation": "",
+      "is_null": false,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": false,
+        "create": false
+      }
+    }
+  ],
+  "indexes": [
+    {
+      "unique": false,
+      "names": ["weight"]
+    },
+    {
+      "unique": false,
+      "names": ["created_at"]
+    },
+    {
+      "unique": false,
+      "names": ["updated_at"]
+    }
+  ]
+}

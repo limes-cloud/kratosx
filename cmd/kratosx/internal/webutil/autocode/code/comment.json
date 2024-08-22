@@ -1,0 +1,130 @@
+{
+  "type": "list",
+  "module": "chat",
+  "name": "chat_record",
+  "struct": "chat_record",
+  "comment": "会话记录信息",
+  "enableBatchDelete": false,
+  "columns": [
+    {
+      "name": "id",
+      "type": "bigint",
+      "comment": "自增id",
+      "collation": "",
+      "is_null": false,
+      "default": "",
+      "unsigned": true,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": false
+      }
+    },
+    {
+      "name": "user_id",
+      "type": "bigint",
+      "comment": "用户id",
+      "collation": "",
+      "is_null": false,
+      "default": "",
+      "unsigned": true,
+      "relations": [],
+      "rules": {
+        "gte": 1
+      },
+      "query": {
+        "type": "="
+      },
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": false
+      }
+    },
+    {
+      "name": "session_id",
+      "type": "varchar",
+      "size": "128",
+      "comment": "会话id",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1,
+        "max_len": 40
+      },
+      "query": {
+        "type": "="
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "message",
+      "type": "text",
+      "comment": "会话信息",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "type",
+      "type": "char",
+      "size": "15",
+      "comment": "会话类型",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "created_at",
+      "type": "bigint",
+      "comment": "创建时间",
+      "collation": "",
+      "is_null": false,
+      "default": "0",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": false,
+        "create": false
+      }
+    }
+  ],
+  "indexes": [
+    {
+      "unique": false,
+      "names": ["created_at"]
+    }
+  ]
+}
