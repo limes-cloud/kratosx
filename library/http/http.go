@@ -60,7 +60,7 @@ func New(conf *config.Http, logger *log.Helper) Request {
 	}
 }
 
-type RequestFunc func(*resty.Request) *resty.Request
+type RequestFunc func(*resty.Request)
 
 func (h *request) DisableLog() Request {
 	h.inputLog = false
@@ -68,7 +68,7 @@ func (h *request) DisableLog() Request {
 }
 
 func (h *request) Option(fn RequestFunc) Request {
-	h.request = fn(h.request)
+	fn(h.request)
 	return h
 }
 
