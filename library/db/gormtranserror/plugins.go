@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	defaultDuplicatedKeyFormat = `{table}中已存在{column}:"{value}"`
-	defaultAddForeignKeyFormat = `{table}中不存在{column}:"{value}"`
-	defaultDelForeignKeyFormat = `{table}中正在使用{column}:"{value}"`
+	defaultDuplicatedKeyFormat = `{table}中已存在{column}"{value}"`
+	defaultAddForeignKeyFormat = `{table}中不存在{column}"{value}"`
+	defaultDelForeignKeyFormat = `{table}中正在使用{column}"{value}"`
 )
 
 type GormErrorPlugin interface {
