@@ -15,7 +15,7 @@ func register(fn registryFunc) {
 	registries = append(registries, fn)
 }
 
-func New(c *conf.Config, hs *http.Server, gs *grpc.Server) {
+func Register(c *conf.Config, hs *http.Server, gs *grpc.Server) {
 	for _, registry := range registries {
 		registry(c, hs, gs)
 	}

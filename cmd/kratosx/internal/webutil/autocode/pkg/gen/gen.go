@@ -25,7 +25,8 @@ type Builder struct {
 }
 
 func NewBuilder(db *gorm.DB, table *types.Table) *Builder {
-	srvRoot := "/Users/fangweiye/GolandProjects/go-platform/framework/kratosx/cmd/kratosx/usercenter"
+	webRoot := "/Users/fangweiye/GolandProjects/go-platform/framework/kratos-layout"
+	srvRoot := "/Users/fangweiye/GolandProjects/go-platform/framework/kratos-layout"
 	tplRoot := "/Users/fangweiye/GolandProjects/go-platform/framework/kratosx/cmd/kratosx/internal/webutil/autocode/template"
 
 	getMod := func(srvRoot string) string {
@@ -52,6 +53,7 @@ func NewBuilder(db *gorm.DB, table *types.Table) *Builder {
 		Table:    table,
 		SrvRoot:  srvRoot,
 		TplRoot:  tplRoot,
+		WebRoot:  webRoot,
 	}
 }
 
@@ -78,7 +80,7 @@ func (b *Builder) ProtoMessageTplPath() string {
 
 // ProtoServicePath 获取proto service 代码地址
 func (b *Builder) ProtoServicePath() string {
-	filename := fmt.Sprintf("%s_%s_service.proto", b.Server, pkg.ToSnake(b.Table.Struct))
+	filename := fmt.Sprintf("%s_%s_service.proto", b.Server, pkg.ToSnake(b.Table.Module))
 	return b.SrvRoot + "/api/" + b.Server + "/" + b.Table.Module + "/" + filename
 }
 
@@ -89,12 +91,12 @@ func (b *Builder) ProtoServiceTplPath() string {
 
 // GoTypesPath 获取类型路径
 func (b *Builder) GoTypesPath() string {
-	return b.SrvRoot + "/internal/types/" + pkg.ToSnake(b.Table.Struct) + ".go"
+	return b.SrvRoot + "/internal/types/" + pkg.ToSnake(b.Table.Module) + ".go"
 }
 
 // GoRepoPath 获取repo路径
 func (b *Builder) GoRepoPath() string {
-	return b.SrvRoot + "/internal/domain/repository/" + pkg.ToSnake(b.Table.Struct) + ".go"
+	return b.SrvRoot + "/internal/domain/repository/" + pkg.ToSnake(b.Table.Module) + ".go"
 }
 
 // GoRepoTplPath 获取repo 模板路径
@@ -104,7 +106,7 @@ func (b *Builder) GoRepoTplPath() string {
 
 // GoEntityPath 获取entity路径
 func (b *Builder) GoEntityPath() string {
-	return b.SrvRoot + "/internal/domain/entity/" + pkg.ToSnake(b.Table.Struct) + ".go"
+	return b.SrvRoot + "/internal/domain/entity/" + pkg.ToSnake(b.Table.Module) + ".go"
 }
 
 // GoEntityTplPath 获取entity模板路径
@@ -114,7 +116,7 @@ func (b *Builder) GoEntityTplPath() string {
 
 // GoDbsPath 获取dbs路径
 func (b *Builder) GoDbsPath() string {
-	return b.SrvRoot + "/internal/infra/dbs/" + pkg.ToSnake(b.Table.Struct) + ".go"
+	return b.SrvRoot + "/internal/infra/dbs/" + pkg.ToSnake(b.Table.Module) + ".go"
 }
 
 // GoDbsTplPath 获取dbs模板路径
@@ -124,7 +126,7 @@ func (b *Builder) GoDbsTplPath() string {
 
 // GoServicePath 获取service路径
 func (b *Builder) GoServicePath() string {
-	return b.SrvRoot + "/internal/domain/service/" + pkg.ToSnake(b.Table.Struct) + ".go"
+	return b.SrvRoot + "/internal/domain/service/" + pkg.ToSnake(b.Table.Module) + ".go"
 }
 
 // GoServiceTplPath 获取service模板路径
@@ -139,7 +141,7 @@ func (b *Builder) IsRelationTypeMany(tp string) bool {
 
 // GoAppPath 获取dbs路径
 func (b *Builder) GoAppPath() string {
-	return b.SrvRoot + "/internal/app/" + pkg.ToSnake(b.Table.Struct) + ".go"
+	return b.SrvRoot + "/internal/app/" + pkg.ToSnake(b.Table.Module) + ".go"
 }
 
 // GoAppTplPath 获取App模板路径
@@ -155,6 +157,11 @@ func (b *Builder) GoAppEntryPath() string {
 // GoAppEntryTplPath 获取App模板路径
 func (b *Builder) GoAppEntryTplPath() string {
 	return b.TplRoot + "/go/entry.tpl"
+}
+
+// GoAppEntryTplPath 获取App模板路径
+func (b *Builder) GoTsApiPath() string {
+	return b.WebRoot + "/go/entry.tpl"
 }
 
 // HasDeletedAt 是否启用delete模板

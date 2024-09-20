@@ -3,19 +3,20 @@ package code
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/gocode"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/proto"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
-	"os"
-	"testing"
 )
 
 func TestCode(t *testing.T) {
 	initTable := func() *types.Table {
 		var table types.Table
-		content, err := os.ReadFile("./auto.json")
+		content, err := os.ReadFile("./comment.json")
 		if err != nil {
 			panic(err)
 		}
@@ -45,7 +46,7 @@ func TestCode(t *testing.T) {
 	}
 	_ = pkg.WriteCode(builder.ProtoMessagePath(), protoMsgCode)
 
-	if err := pkg.GenProtoGRpc(builder.ProtoMessagePath()); err != nil {
+	if err := pkg.GenProtoGRpc(builder.SrvRoot, builder.ProtoMessagePath()); err != nil {
 		fmt.Println("🚫 generate proto message error " + err.Error())
 	}
 
@@ -56,7 +57,7 @@ func TestCode(t *testing.T) {
 	}
 	_ = pkg.WriteCode(builder.ProtoServicePath(), protoSrvCode)
 
-	if err := pkg.GenProtoGRpc(builder.ProtoServicePath()); err != nil {
+	if err := pkg.GenProtoGRpc(builder.SrvRoot, builder.ProtoServicePath()); err != nil {
 		fmt.Println("🚫 generate proto service error " + err.Error())
 	}
 
@@ -111,4 +112,9 @@ func TestCode(t *testing.T) {
 		fmt.Println("🚫 generate proto error error " + err.Error())
 	}
 	_ = pkg.WriteCode(builder.GoAppEntryPath(), goAppEntryCode)
+
+	// 生成ts代码
+	// tsBuilder := web.NewTsBuilder(builder)
+	// webTsCode, err := tsBuilder.GenTypeScript(builder.ProtoMessagePath(), builder.ProtoServicePath())
+	// _ = pkg.WriteCode(builder.ProtoServicePath(), goAppEntryCode)
 }

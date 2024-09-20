@@ -1,12 +1,13 @@
 package pkg
 
 import (
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"os"
 	"os/exec"
 	"strings"
 	"unicode"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // IsExistFile 判断是否存在文件
@@ -176,10 +177,12 @@ func WriteCode(path string, code string) error {
 	return os.WriteFile(path, []byte(code), 0666)
 }
 
-func GenProtoGRpc(path string) error {
+func GenProtoGRpc(work string, path string) error {
+	path = strings.TrimPrefix(path, work)
+	path = strings.TrimPrefix(path, "/")
 	fd := exec.Command("kratosx", "proto", "client", path)
 	fd.Stdout = os.Stdout
 	fd.Stderr = os.Stderr
-	fd.Dir = "."
+	fd.Dir = work
 	return fd.Run()
 }

@@ -226,7 +226,7 @@ func (p *Message) renderStruct(msg *MessageStruct, spec string) string {
 		rows = append(rows, row)
 	}
 
-	if msg.IsOneOf {
+	if msg.IsOneOf && len(rows) > 1 {
 		for ind, row := range rows {
 			rows[ind] = "  " + spec + row
 		}
@@ -412,9 +412,9 @@ func (p *Message) makeGetReply(table *types.Table, trash bool, deep ...bool) *Me
 
 		tp := column.ProtoType()
 		field := &MessageStructField{
-			Keyword:  pkg.VariableName(column.Name, p.NameRule),
-			Type:     tp,
-			Validate: p.ruleString(tp, column.Rules),
+			Keyword: pkg.VariableName(column.Name, p.NameRule),
+			Type:    tp,
+			// Validate: p.ruleString(tp, column.Rules),
 		}
 		if column.IsProtoOption() {
 			field.Decorate = "optional "
@@ -425,7 +425,6 @@ func (p *Message) makeGetReply(table *types.Table, trash bool, deep ...bool) *Me
 			relation := *item
 			pm := p.makeGetReply(relation.Table, trash, true)
 			pm.RelationType = relation.Type
-			pm.Rules = relation.Rules
 			msg.Relations = append(msg.Relations, pm)
 		}
 	}
@@ -535,9 +534,8 @@ func (p *Message) makeListReply(table *types.Table, trash bool, deep ...bool) *M
 
 		tp := column.ProtoType()
 		field := &MessageStructField{
-			Keyword:  pkg.VariableName(column.Name, p.NameRule),
-			Type:     tp,
-			Validate: p.ruleString(tp, column.Rules),
+			Keyword: pkg.VariableName(column.Name, p.NameRule),
+			Type:    tp,
 		}
 		if column.IsProtoOption() {
 			field.Decorate = "optional "
@@ -548,7 +546,6 @@ func (p *Message) makeListReply(table *types.Table, trash bool, deep ...bool) *M
 			relation := *item
 			pm := p.makeListReply(relation.Table, trash, true)
 			pm.RelationType = relation.Type
-			pm.Rules = relation.Rules
 			msg.Relations = append(msg.Relations, pm)
 		}
 	}

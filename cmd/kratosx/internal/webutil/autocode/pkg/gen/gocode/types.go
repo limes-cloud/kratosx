@@ -3,15 +3,16 @@ package gocode
 import (
 	"bytes"
 	"fmt"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 	"go/ast"
 	"go/parser"
 	"go/printer"
 	"go/token"
 	"os"
 	"strings"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 )
 
 type Types struct {
@@ -176,7 +177,12 @@ func (p *Types) RenderTypes(types *TypesCode) string {
 	if len(types.imports) != 0 {
 		code += fmt.Sprintf("import (\n%s\n)\n", strings.Join(types.imports, "\n"))
 	}
+
+	trash := p.HasDeletedAt()
 	for _, item := range types.sort {
+		if !trash && strings.Contains(item, "Trash") {
+			continue
+		}
 		code += types.bucket[item] + "\n"
 	}
 

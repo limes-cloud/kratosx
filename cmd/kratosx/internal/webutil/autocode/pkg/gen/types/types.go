@@ -103,7 +103,7 @@ func (c *Column) ProtoType() string {
 		return "float"
 	case "time.Time":
 		return "google.protobuf.Timestamp"
-	case "int64", "uint64":
+	case "int64", "uint64", "uint32":
 		return "uint32"
 	case "bool":
 		return "bool"
@@ -126,7 +126,7 @@ func (c *Column) GoType() string {
 	case "mediumint":
 		return "int32"
 	case "bigint":
-		return "int64"
+		return "uint32"
 	case "float":
 		return "float32"
 	case "real":
@@ -175,7 +175,7 @@ func (c *Column) GoType() string {
 		return "int32"
 	case "bit":
 		return "[]uint8"
-	case "boolean":
+	case "boolean", "bool":
 		return "bool"
 	case "tinyint":
 		if strings.HasPrefix(strings.TrimSpace(c.ColumnType), "tinyint(1)") || c.Size == "1" {

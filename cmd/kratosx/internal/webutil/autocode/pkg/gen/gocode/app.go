@@ -3,9 +3,6 @@ package gocode
 import (
 	"bytes"
 	"fmt"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 	"go/ast"
 	"go/format"
 	"go/parser"
@@ -14,6 +11,10 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 )
 
 type byAppCodeType struct {
@@ -142,7 +143,6 @@ func (p *App) makeGetByCodes(object *types.Table) []byAppCodeType {
 			fields []string
 		)
 		for _, name := range index.Names {
-
 			if name == "deleted_at" {
 				continue
 			}
@@ -185,7 +185,6 @@ func (p *App) makeListQuery(object *types.Table) []string {
 		} else {
 			list = append(list, key)
 		}
-
 	}
 	return list
 }
@@ -231,8 +230,14 @@ func (p *App) RenderApp(app *AppCode) string {
 		code += fmt.Sprintf("import (\n%s\n)\n", strings.Join(app.imports, "\n"))
 	}
 
-	var lines []string
+	var (
+		lines []string
+		trash = p.HasDeletedAt()
+	)
 	for _, item := range app.sort {
+		if !trash && strings.Contains(item, "Trash") {
+			continue
+		}
 		lines = append(lines, app.bucket[item])
 	}
 

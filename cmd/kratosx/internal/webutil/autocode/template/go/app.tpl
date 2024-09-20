@@ -12,6 +12,8 @@ import (
 	pb "{{.Module}}/api/{{.Server}}/{{.ClassifyLowerCase}}/v1"
 	"{{.Module}}/internal/domain/service"
 	"{{.Module}}/internal/conf"
+	"{{.Module}}/internal/types"
+	"{{.Module}}/internal/domain/entity"
 	"{{.Module}}/internal/infra/dbs"
 )
 
@@ -84,6 +86,10 @@ func (s *{{.Classify}}App) Get{{.Object}}(c context.Context, req *pb.Get{{.Objec
 func (s *{{.Classify}}App) List{{.Object}}(c context.Context, req *pb.List{{.Object}}Request) (*pb.List{{.Object}}Reply, error) {
 	var ctx = kratosx.MustContext(c)
 	result, total, err := s.srv.List{{.Object}}(ctx, &types.List{{.Object}}Request{
+        Page:     req.Page,
+		PageSize: req.PageSize,
+		Order:    req.Order,
+		OrderBy:  req.OrderBy,
         {{- range $val := .QueryFields}}
         {{$val}}:req.{{$val}},
         {{- end}}
@@ -179,6 +185,10 @@ func (s *{{.Classify}}App) ListTrash{{.Object}}(c context.Context, req *pb.ListT
 	var ctx = kratosx.MustContext(c)
 
 	result, total, err := s.srv.ListTrash{{.Object}}(ctx, &types.ListTrash{{.Object}}Request{
+        Page:     req.Page,
+		PageSize: req.PageSize,
+		Order:    req.Order,
+		OrderBy:  req.OrderBy,
 	    {{- range $val := .QueryFields}}
         {{$val}}:req.{{$val}},
         {{- end}}

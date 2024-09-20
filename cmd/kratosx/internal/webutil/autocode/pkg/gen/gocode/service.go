@@ -3,9 +3,6 @@ package gocode
 import (
 	"bytes"
 	"fmt"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 	"go/ast"
 	"go/format"
 	"go/parser"
@@ -14,6 +11,10 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 )
 
 type bySrvCodeType struct {
@@ -141,7 +142,6 @@ func (p *Service) makeGetByCodes(object *types.Table) []bySrvCodeType {
 			fields []string
 		)
 		for _, name := range index.Names {
-
 			if name == "deleted_at" {
 				continue
 			}
@@ -230,8 +230,14 @@ func (p *Service) RenderService(service *ServiceCode) string {
 		code += fmt.Sprintf("import (\n%s\n)\n", strings.Join(service.imports, "\n"))
 	}
 
-	var lines []string
+	var (
+		lines []string
+		trash = p.HasDeletedAt()
+	)
 	for _, item := range service.sort {
+		if !trash && strings.Contains(item, "Trash") {
+			continue
+		}
 		lines = append(lines, service.bucket[item])
 	}
 

@@ -6,7 +6,7 @@ import (
     "{{.Module}}/internal/types"
 )
 
-type {{.Classify}}Repository interface {
+type {{.ClassifyUpper}}Repository interface {
 	// Get{{.Object}} 获取指定的{{.Title}}
 	Get{{.Object}}(ctx kratosx.Context, id uint32) (*entity.{{.Object}}, error)
 

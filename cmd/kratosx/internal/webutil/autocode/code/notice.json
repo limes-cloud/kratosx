@@ -1,9 +1,9 @@
 {
   "type": "list",
-  "module": "banner",
-  "name": "banner",
-  "struct": "banner",
-  "comment": "轮播图信息",
+  "module": "notice",
+  "name": "notice",
+  "struct": "notice",
+  "comment": "通知信息",
   "enableBatchDelete": false,
   "columns": [
     {
@@ -26,7 +26,7 @@
       "name": "title",
       "type": "varchar",
       "size": "128",
-      "comment": "轮播标题",
+      "comment": "通知标题",
       "is_null": false,
       "default": "",
       "unsigned": false,
@@ -46,10 +46,10 @@
       }
     },
     {
-      "name": "src",
+      "name": "description",
       "type": "varchar",
       "size": "128",
-      "comment": "轮播url",
+      "comment": "通知简介",
       "is_null": false,
       "default": "",
       "unsigned": false,
@@ -65,13 +65,16 @@
       }
     },
     {
-      "name": "path",
+      "name": "unit",
       "type": "varchar",
       "size": "128",
-      "comment": "跳转路径",
-      "is_null": true,
+      "comment": "发布单位",
+      "is_null": false,
       "default": "",
       "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
       "relations": [],
       "operation": {
         "get": true,
@@ -81,15 +84,34 @@
       }
     },
     {
-      "name": "weight",
+      "name": "content",
+      "type": "longtext",
+      "size": "128",
+      "comment": "通知内容",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": false,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "is_top",
       "type": "tinyint",
-      "size": "",
-      "comment": "权重",
+      "size": "1",
+      "comment": "是否置顶",
       "collation": "",
       "is_null": true,
       "default": "0",
       "unsigned": false,
       "relations": [],
+      "query": {
+        "type": "="
+      },
       "operation": {
         "get": true,
         "list": true,
@@ -101,7 +123,7 @@
       "name": "status",
       "type": "bool",
       "size": "1",
-      "comment": "状态",
+      "comment": "通知状态",
       "collation": "",
       "is_null": true,
       "default": "0",
@@ -151,10 +173,6 @@
     }
   ],
   "indexes": [
-    {
-      "unique": false,
-      "names": ["weight"]
-    },
     {
       "unique": false,
       "names": ["created_at"]

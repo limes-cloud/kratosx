@@ -5,12 +5,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/autocode"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/change"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/project"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/proto"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/run"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/upgrade"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil"
 )
 
 var rootCmd = &cobra.Command{
@@ -26,7 +26,7 @@ func init() {
 	rootCmd.AddCommand(upgrade.CmdUpgrade)
 	rootCmd.AddCommand(change.CmdChange)
 	rootCmd.AddCommand(run.CmdRun)
-	rootCmd.AddCommand(autocode.CmdAutoCode)
+	rootCmd.AddCommand(webutil.CmdWebUtil)
 }
 
 func main() {

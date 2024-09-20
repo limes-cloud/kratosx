@@ -15,7 +15,7 @@ import (
 func Middlewares(conf *config.Client) []middleware.Middleware {
 	mds := []middleware.Middleware{
 		midmetadata.Client(),
-		logging.Client(logger.Instance(logger.AddCallerSkip(-1))),
+		logging.Client(logger.Instance()),
 		circuitbreaker.Client(),
 		tracing.Client(),
 		signature.Instance().Client(conf.Signature),

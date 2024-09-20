@@ -3,9 +3,6 @@ package gocode
 import (
 	"bytes"
 	"fmt"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 	"go/ast"
 	"go/parser"
 	"go/printer"
@@ -13,6 +10,10 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 )
 
 type Repo struct {
@@ -136,7 +137,6 @@ func (p *Repo) makeGetByCodes(object *types.Table) []byRepoCodeType {
 			where  []string
 		)
 		for _, name := range index.Names {
-
 			if name == "deleted_at" {
 				continue
 			}
@@ -178,6 +178,7 @@ func (p *Repo) MakeRepo() (*RepoCode, error) {
 		"Module":            p.Module,
 		"GetByCodes":        p.makeGetByCodes(p.Table),
 		"Classify":          p.Table.Module,
+		"ClassifyUpper":     pkg.ToUpperHump(p.Table.Module),
 		"Object":            pkg.ToUpperHump(p.Table.Struct),
 		"Title":             p.Table.Comment,
 	}
@@ -194,12 +195,18 @@ func (p *Repo) RenderRepo(repo *RepoCode) string {
 		code += fmt.Sprintf("import (\n%s\n)\n", strings.Join(repo.imports, "\n"))
 	}
 
-	var lines []string
+	var (
+		lines []string
+		trash = p.HasDeletedAt()
+	)
 	for _, item := range repo.sort {
+		if !trash && strings.Contains(item, "Trash") {
+			continue
+		}
 		lines = append(lines, repo.bucket[item])
 	}
 
-	code += fmt.Sprintf("type %sRepository interface{\n%s\n}", pkg.ToUpperHump(p.Table.Struct), strings.Join(lines, "\n"))
+	code += fmt.Sprintf("type %sRepository interface{\n%s\n}", pkg.ToUpperHump(p.Table.Module), strings.Join(lines, "\n"))
 
 	return p.FormatGoCode(code)
 }

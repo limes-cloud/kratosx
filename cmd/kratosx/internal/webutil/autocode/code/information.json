@@ -1,9 +1,9 @@
 {
   "type": "list",
-  "module": "notice",
-  "name": "notice",
-  "struct": "notice",
-  "comment": "通知信息",
+  "module": "information",
+  "name": "information",
+  "struct": "information",
+  "comment": "咨询信息",
   "enableBatchDelete": false,
   "columns": [
     {
@@ -26,7 +26,7 @@
       "name": "title",
       "type": "varchar",
       "size": "128",
-      "comment": "通知标题",
+      "comment": "咨询标题",
       "is_null": false,
       "default": "",
       "unsigned": false,
@@ -49,7 +49,26 @@
       "name": "description",
       "type": "varchar",
       "size": "128",
-      "comment": "通知简介",
+      "comment": "咨询简介",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "rules": {
+        "min_len": 1
+      },
+      "relations": [],
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "cover",
+      "type": "varchar",
+      "size": "128",
+      "comment": "咨询封面",
       "is_null": false,
       "default": "",
       "unsigned": false,
@@ -87,7 +106,7 @@
       "name": "content",
       "type": "longtext",
       "size": "128",
-      "comment": "通知内容",
+      "comment": "咨询内容",
       "is_null": false,
       "default": "",
       "unsigned": false,
@@ -123,7 +142,7 @@
       "name": "status",
       "type": "bool",
       "size": "1",
-      "comment": "通知状态",
+      "comment": "咨询状态",
       "collation": "",
       "is_null": true,
       "default": "0",
@@ -132,6 +151,21 @@
       "query": {
         "type": "="
       },
+      "operation": {
+        "get": true,
+        "list": true,
+        "update": true,
+        "create": true
+      }
+    },
+    {
+      "name": "read",
+      "type": "bigint",
+      "comment": "阅读人数",
+      "is_null": false,
+      "default": "",
+      "unsigned": false,
+      "relations": [],
       "operation": {
         "get": true,
         "list": true,

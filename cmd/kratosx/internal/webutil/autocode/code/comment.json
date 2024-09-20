@@ -1,9 +1,9 @@
 {
   "type": "list",
-  "module": "chat",
-  "name": "chat_record",
-  "struct": "chat_record",
-  "comment": "会话记录信息",
+  "module": "comment",
+  "name": "comment",
+  "struct": "comment",
+  "comment": "留言信息",
   "enableBatchDelete": false,
   "columns": [
     {
@@ -45,51 +45,9 @@
       }
     },
     {
-      "name": "session_id",
-      "type": "varchar",
-      "size": "128",
-      "comment": "会话id",
-      "is_null": false,
-      "default": "",
-      "unsigned": false,
-      "rules": {
-        "min_len": 1,
-        "max_len": 40
-      },
-      "query": {
-        "type": "="
-      },
-      "relations": [],
-      "operation": {
-        "get": true,
-        "list": true,
-        "update": true,
-        "create": true
-      }
-    },
-    {
-      "name": "message",
+      "name": "content",
       "type": "text",
-      "comment": "会话信息",
-      "is_null": false,
-      "default": "",
-      "unsigned": false,
-      "rules": {
-        "min_len": 1
-      },
-      "relations": [],
-      "operation": {
-        "get": true,
-        "list": true,
-        "update": true,
-        "create": true
-      }
-    },
-    {
-      "name": "type",
-      "type": "char",
-      "size": "15",
-      "comment": "会话类型",
+      "comment": "留言",
       "is_null": false,
       "default": "",
       "unsigned": false,

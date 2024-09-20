@@ -3,9 +3,6 @@ package gocode
 import (
 	"bytes"
 	"fmt"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 	"go/ast"
 	"go/format"
 	"go/parser"
@@ -14,6 +11,10 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/autocode/pkg/gen/types"
 )
 
 type byDbsCodeType struct {
@@ -139,7 +140,6 @@ func (p *Dbs) makeGetByCodes(object *types.Table) []byDbsCodeType {
 			where  []string
 		)
 		for _, name := range index.Names {
-
 			if name == "deleted_at" {
 				continue
 			}
@@ -330,7 +330,6 @@ func (p *Dbs) makeListQuery(object *types.Table) []string {
 			code := fmt.Sprintf(tpl, upperName, snakeName, column.Query.Type, upperName)
 			list = append(list, code)
 		}
-
 	}
 	return list
 }
@@ -385,8 +384,14 @@ func (p *Dbs) RenderDbs(dbs *DbsCode) string {
 		code += fmt.Sprintf("import (\n%s\n)\n", strings.Join(dbs.imports, "\n"))
 	}
 
-	var lines []string
+	var (
+		lines []string
+		trash = p.HasDeletedAt()
+	)
 	for _, item := range dbs.sort {
+		if !trash && strings.Contains(item, "Trash") {
+			continue
+		}
 		lines = append(lines, dbs.bucket[item])
 	}
 

@@ -1,23 +1,24 @@
-package autocode
+package webutil
 
 import (
-	"fmt"
+	"log"
+
+	"github.com/go-kratos/kratos/v2"
+	"github.com/go-kratos/kratos/v2/transport/http"
 	"github.com/spf13/cobra"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil/router"
 )
 
-var CmdAutoCode = &cobra.Command{
-	Use:   "autocode",
-	Short: "auto generate code",
-	Long:  "autocode the kratosx tools. Example: kratosx autocode 8080",
+var CmdWebUtil = &cobra.Command{
+	Use:   "webutil",
+	Short: "webutil start",
+	Long:  "webutil the kratosx tools. Example: kratosx webutil 8080",
 	Run:   Run,
 }
 
-var (
-	port string
-)
-
 func init() {
-	//CmdAutoCode.Flags().StringVarP(&port, "port", "p", "9000", "server port")
+	// CmdAutoCode.Flags().StringVarP(&port, "port", "p", "9000", "server port")
 }
 
 func Run(_ *cobra.Command, args []string) {
@@ -25,7 +26,24 @@ func Run(_ *cobra.Command, args []string) {
 		panic("example: kratosx autocode 8080")
 	}
 
-	port = args[0]
+	srv := NewServer(args[0])
 
-	fmt.Println(port)
+	router.NewRouter(srv)
+
+	app := kratos.New(
+		kratos.Name("webutil"),
+		kratos.Version("v1.0.0"),
+		kratos.Server(),
+	)
+
+	if err := app.Run(); err != nil {
+		log.Fatal(err.Error())
+	}
+}
+
+func NewServer(port string) *http.Server {
+	return http.NewServer(
+		http.Address(":"+port),
+		http.Middleware(),
+	)
 }

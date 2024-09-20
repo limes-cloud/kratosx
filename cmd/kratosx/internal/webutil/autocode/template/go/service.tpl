@@ -91,8 +91,7 @@ func (srv *{{.Classify}}Service) Delete{{.Object}}(ctx kratosx.Context, ids []ui
 {{- else}}
 // Delete{{.Object}} 删除{{.Title}}
 func (srv *{{.Classify}}Service) Delete{{.Object}}(ctx kratosx.Context, id uint32) error {
-	total, err :=srv.repo.Delete{{.Object}}(ctx, id)
-	if err != nil {
+	if err :=srv.repo.Delete{{.Object}}(ctx, id); err != nil {
 		return  errors.DeleteError(err.Error())
 	}
 	return  nil
@@ -141,8 +140,7 @@ func (srv *{{.Classify}}Service) DeleteTrash{{.Object}}(ctx kratosx.Context, ids
 {{- else}}
 // DeleteTrash{{.Object}} 彻底删除{{.Title}}
 func (srv *{{.Classify}}Service) DeleteTrash{{.Object}}(ctx kratosx.Context, id uint32) error {
-	total, err :=srv.repo.DeleteTrash{{.Object}}(ctx, id)
-	if err != nil {
+	if err :=srv.repo.DeleteTrash{{.Object}}(ctx, id);err != nil {
 		return errors.DeleteTrashError(err.Error())
 	}
 	return nil
