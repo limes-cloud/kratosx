@@ -268,11 +268,6 @@ func (ep *ErrorPlugin) ForeignKey(db *gorm.DB, err *mysql.MySQLError, isCreate b
 	table := ""
 	column := ""
 	value := ""
-	if len(db.Statement.Vars) > 3 {
-		value = fmt.Sprint(append(db.Statement.Vars[:3], "..."))
-	} else {
-		value = fmt.Sprint(db.Statement.Vars)
-	}
 
 	if isCreate {
 		format = ep.opts.addForeignKeyFormat
@@ -282,6 +277,18 @@ func (ep *ErrorPlugin) ForeignKey(db *gorm.DB, err *mysql.MySQLError, isCreate b
 		format = ep.opts.delForeignKeyFormat
 		table = info.Foreign.Table
 		column = info.Foreign.Column
+	}
+
+	if len(db.Statement.Vars) == 1 {
+		value = fmt.Sprint(db.Statement.Vars[0])
+	} else {
+		rv := db.Statement.ReflectValue
+		for _, col := range db.Statement.Schema.Fields {
+			if col.DBName == column {
+				v := rv.FieldByName(col.Name)
+				value = fmt.Sprint(v.Interface())
+			}
+		}
 	}
 
 	// 替换table
