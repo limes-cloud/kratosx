@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	ec "github.com/limes-cloud/kratosx/config"
 	"html/template"
-	"net/smtp"
 	"unsafe"
+
+	"gopkg.in/gomail.v2"
+
+	ec "github.com/limes-cloud/kratosx/config"
 )
 
 type Sender interface {
@@ -47,12 +49,26 @@ func (s *sender) Send(email string, name string, variable ...any) error {
 		return err
 	}
 
-	auth := smtp.PlainAuth("", conf.User, conf.Password, conf.Host)
-	ct := fmt.Sprintf("Content-Type: %v; charset=UTF-8", tpc.Type)
-	to := fmt.Sprintf("To: %s<%s>", name, email)
-	from := fmt.Sprintf("From: %s<%s>", conf.Name, conf.User)
-	subject := fmt.Sprintf("Subject: %s", tpc.Subject)
-	msg := []byte(to + "\r\n" + from + "\r\n" + subject + "\r\n" + ct + "\r\n\r\n" + html.String())
-	host := fmt.Sprintf("%s:%d", conf.Host, conf.Port)
-	return smtp.SendMail(host, auth, conf.User, []string{email}, msg)
+	m := gomail.NewMessage()
+	m.SetHeader("From", m.FormatAddress(conf.User, conf.Name))
+	m.SetHeader("To", m.FormatAddress(email, name))
+	m.SetHeader("Subject", tpc.Subject)
+	m.SetBody(fmt.Sprintf("%v; charset=UTF-8", tpc.Type), html.String())
+	d := gomail.NewDialer(
+		conf.Host,
+		conf.Port,
+		conf.User,
+		conf.Password,
+	)
+	return d.DialAndSend(m)
+
+	// auth := smtp.PlainAuth("", conf.User, conf.Password, conf.Host)
+	// ct := fmt.Sprintf("Content-Type: %v; charset=UTF-8", tpc.Type)
+	// to := fmt.Sprintf("To: %s<%s>", name, email)
+	// from := fmt.Sprintf("From: %s<%s>", conf.Name, conf.User)
+	// subject := fmt.Sprintf("Subject: %s", tpc.Subject)
+	// msg := []byte(to + "\r\n" + from + "\r\n" + subject + "\r\n" + ct + "\r\n\r\n" + html.String())
+	// host := fmt.Sprintf("%s:%d", conf.Host, conf.Port)
+	// err = smtp.SendMail(host, auth, conf.User, []string{email}, msg)
+	// return err
 }
