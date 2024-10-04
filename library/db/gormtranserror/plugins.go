@@ -281,7 +281,7 @@ func (ep *ErrorPlugin) ForeignKey(db *gorm.DB, err *mysql.MySQLError, isCreate b
 
 	if len(db.Statement.Vars) == 1 {
 		value = fmt.Sprint(db.Statement.Vars[0])
-	} else {
+	} else if db.Statement.ReflectValue.Kind() == reflect.Struct {
 		rv := db.Statement.ReflectValue
 		for _, col := range db.Statement.Schema.Fields {
 			if col.DBName == column {
@@ -289,6 +289,9 @@ func (ep *ErrorPlugin) ForeignKey(db *gorm.DB, err *mysql.MySQLError, isCreate b
 				value = fmt.Sprint(v.Interface())
 			}
 		}
+	} else {
+		vs := db.Statement.Vars[0:3]
+		value = fmt.Sprint(vs) + "..."
 	}
 
 	// 替换table
