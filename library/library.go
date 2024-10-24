@@ -15,6 +15,7 @@ import (
 	"github.com/limes-cloud/kratosx/library/prometheus"
 	"github.com/limes-cloud/kratosx/library/redis"
 	"github.com/limes-cloud/kratosx/library/signature"
+	"github.com/limes-cloud/kratosx/library/stop"
 )
 
 func Init(conf config.Config, fs logger.LogField) {
@@ -56,4 +57,7 @@ func Init(conf config.Config, fs logger.LogField) {
 
 	// 初始化监控
 	prometheus.Init(conf.App().Prometheus, conf.Watch)
+
+	// 初始化退出等待
+	stop.Init()
 }

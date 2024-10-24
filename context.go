@@ -27,6 +27,7 @@ import (
 	"github.com/limes-cloud/kratosx/library/pool"
 	"github.com/limes-cloud/kratosx/library/prometheus"
 	rd "github.com/limes-cloud/kratosx/library/redis"
+	"github.com/limes-cloud/kratosx/library/stop"
 )
 
 type Context interface {
@@ -49,6 +50,7 @@ type Context interface {
 	WaitRunner() pool.WaitRunner
 	Http() http.Request
 	GrpcConn(srvName string) (*grpc.ClientConn, error)
+	RegisterAfterStop(name string, fn func())
 
 	ID() string
 	Name() string
@@ -208,11 +210,17 @@ func (c *ctx) GrpcConn(srvName string) (*grpc.ClientConn, error) {
 	return cli.Conn(c.Ctx())
 }
 
+// Clone 克隆上下文，上下文中继承了被克隆的值，但是并不会收到上下文的timeout和cancel信号。
 func (c *ctx) Clone() Context {
 	return MustContext(&cloneCtx{
 		child:  context.Background(),
 		parent: c.Context,
 	})
+}
+
+// RegisterAfterStop 注册服务关闭回调
+func (c *ctx) RegisterAfterStop(name string, fn func()) {
+	stop.Instance().Register(name, fn)
 }
 
 // Env 获取配置环境

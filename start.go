@@ -1,6 +1,7 @@
 package kratosx
 
 import (
+	"context"
 	"os"
 
 	"github.com/go-kratos/kratos/v2"
@@ -14,6 +15,7 @@ import (
 	"github.com/limes-cloud/kratosx/library/logger"
 	"github.com/limes-cloud/kratosx/library/pprof"
 	"github.com/limes-cloud/kratosx/library/registry"
+	"github.com/limes-cloud/kratosx/library/stop"
 )
 
 const (
@@ -65,6 +67,10 @@ func New(opts ...Option) *kratos.App {
 		kratos.Name(o.config.App().Name),
 		kratos.Version(o.config.App().Version),
 		kratos.Metadata(map[string]string{}),
+		kratos.AfterStop(func(ctx2 context.Context) error {
+			stop.Instance().Wait()
+			return nil
+		}),
 	}
 
 	// 必注册服务
