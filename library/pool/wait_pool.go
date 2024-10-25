@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -15,12 +17,27 @@ type WaitRunner interface {
 }
 
 type waitRunner struct {
-	wg *sync.WaitGroup
+	max  int32
+	size *atomic.Int32
+	wg   *sync.WaitGroup
 }
 
 type waitTask struct {
-	wg *sync.WaitGroup
-	fn func() error
+	size *atomic.Int32
+	wg   *sync.WaitGroup
+	fn   func() error
+}
+
+type WaitRunnerOption struct {
+	max int32
+}
+
+type WaitRunnerOptionFunc func(o *WaitRunnerOption)
+
+func WithWaitRunnerOption(max int32) WaitRunnerOptionFunc {
+	return func(o *WaitRunnerOption) {
+		o.max = max
+	}
 }
 
 // Run 执行协程任务
@@ -29,15 +46,25 @@ func (w *waitTask) Run() (err error) {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
 		}
+		w.size.Add(-1)
 		w.wg.Done()
 	}()
 	return w.fn()
 }
 
 // NewWaitRunner 创建等待协程任务
-func NewWaitRunner() WaitRunner {
+func NewWaitRunner(opts ...WaitRunnerOptionFunc) WaitRunner {
+	opt := &WaitRunnerOption{
+		max: -1,
+	}
+	for _, o := range opts {
+		o(opt)
+	}
+
 	return &waitRunner{
-		wg: &sync.WaitGroup{},
+		wg:   &sync.WaitGroup{},
+		max:  opt.max,
+		size: &atomic.Int32{},
 	}
 }
 
@@ -57,8 +84,15 @@ func (w *waitRunner) AddTask(ctx context.Context, f func() error) {
 	case <-ctx.Done():
 		log.Error(ctx, fmt.Sprintf("添加携程任务失败:%s", ctx.Err()))
 	default:
+		for w.max > 0 && w.size.Load() >= w.max {
+			time.Sleep(100 * time.Microsecond)
+		}
+
 		w.wg.Add(1)
+		w.size.Add(1)
 		if err := ins.Go(w.taskRunner(f)); err != nil {
+			w.size.Add(-1)
+			w.wg.Done()
 			log.Error(ctx, fmt.Sprintf("添加携程任务失败:%s", ctx.Err()))
 		}
 	}
@@ -67,8 +101,9 @@ func (w *waitRunner) AddTask(ctx context.Context, f func() error) {
 // taskRunner 协程任务
 func (w *waitRunner) taskRunner(f func() error) Runner {
 	return &waitTask{
-		wg: w.wg,
-		fn: f,
+		wg:   w.wg,
+		size: w.size,
+		fn:   f,
 	}
 }
 

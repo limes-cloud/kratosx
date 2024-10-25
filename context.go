@@ -31,38 +31,100 @@ import (
 )
 
 type Context interface {
+	// Env 获取环境变量
 	Env() string
+
+	// Logger 获取链路日志器
 	Logger() *log.Helper
+
+	// DB 获取数据库
 	DB(name ...string) *gorm.DB
+
+	// Transaction 获取DB事务
 	Transaction(fn func(ctx Context) error, name ...string) error
+
+	// Redis 获取Redis客户端
 	Redis(name ...string) *redis.Client
+
+	// Go 获取全局协程池
 	Go(runner pool.Runner) error
+
+	// Loader 获取文件加载器
 	Loader(name string) []byte
+
+	// Email 获取邮件服务
 	Email() email.Email
+
+	// ClientIP 获取客户端IP库
 	ClientIP() string
+
+	// Captcha 获取验证码服务
 	Captcha() captcha.Captcha
+
+	// JWT 获取Jwt服务
 	JWT() jwt.Jwt
+
+	// Token 获取JwtToken
 	Token() string
+
+	// Authentication 获取认证服务
 	Authentication() authentication.Authentication
+
+	// Ctx 获取行下文ctx
 	Ctx() context.Context
+
+	// GetMetadata 获取元数据
 	GetMetadata(string) string
+
+	// SetMetadata 设置元数据
 	SetMetadata(key, value string)
-	WaitRunner() pool.WaitRunner
+
+	// WaitRunner 获取等待协程池
+	WaitRunner(opts ...pool.WaitRunnerOptionFunc) pool.WaitRunner
+
+	// Http 获取http请求
 	Http() http.Request
+
+	// GrpcConn 获取grpc连接
 	GrpcConn(srvName string) (*grpc.ClientConn, error)
+
+	// RegisterBeforeStop 注册关闭前执行函数
+	RegisterBeforeStop(name string, fn func())
+
+	// RegisterAfterStop 注册关闭后执行函数
 	RegisterAfterStop(name string, fn func())
 
+	// ID 获取ID
 	ID() string
+
+	// Name 获取服务名称
 	Name() string
+
+	// Version 获取服务版本
 	Version() string
+
+	// Metadata 获取元数据
 	Metadata() map[string]string
+
+	// Config 获取配置
 	Config() config.Config
+
+	// Endpoint 获取服务地址
 	Endpoint() []string
 
+	// Clone 获取行下文ctx
 	Clone() Context
+
+	// Deadline 获取截止时间
 	Deadline() (deadline time.Time, ok bool)
+
+	// Done 获取关闭通道
 	Done() <-chan struct{}
+
+	// Err 获取错误
 	Err() error
+
+	// Value 获取值
 	Value(key any) any
 }
 
@@ -136,8 +198,8 @@ func (c *ctx) Go(runner pool.Runner) error {
 }
 
 // WaitRunner 获取并发池等待实例
-func (c *ctx) WaitRunner() pool.WaitRunner {
-	return pool.NewWaitRunner()
+func (c *ctx) WaitRunner(opts ...pool.WaitRunnerOptionFunc) pool.WaitRunner {
+	return pool.NewWaitRunner(opts...)
 }
 
 // Loader 获加载器实例
@@ -218,9 +280,14 @@ func (c *ctx) Clone() Context {
 	})
 }
 
+// RegisterBeforeStop 注册服务关闭回调
+func (c *ctx) RegisterBeforeStop(name string, fn func()) {
+	stop.Instance().RegisterBefore(name, fn)
+}
+
 // RegisterAfterStop 注册服务关闭回调
 func (c *ctx) RegisterAfterStop(name string, fn func()) {
-	stop.Instance().Register(name, fn)
+	stop.Instance().RegisterAfter(name, fn)
 }
 
 // Env 获取配置环境

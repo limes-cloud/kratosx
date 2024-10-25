@@ -67,8 +67,12 @@ func New(opts ...Option) *kratos.App {
 		kratos.Name(o.config.App().Name),
 		kratos.Version(o.config.App().Version),
 		kratos.Metadata(map[string]string{}),
+		kratos.BeforeStop(func(ctx2 context.Context) error {
+			stop.Instance().WaitBefore()
+			return nil
+		}),
 		kratos.AfterStop(func(ctx2 context.Context) error {
-			stop.Instance().Wait()
+			stop.Instance().WaitAfter()
 			return nil
 		}),
 	}
