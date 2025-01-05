@@ -3,16 +3,16 @@ package gormtranserror
 import "sync"
 
 var (
-	_ins GormErrorPlugin
+	ins  GormErrorPlugin
 	once sync.Once
 )
 
 func NewGlobalGormErrorPlugin(opts ...Option) GormErrorPlugin {
 	once.Do(func() {
-		_ins = NewGormErrorPlugin(opts...)
-		if _ins.options().db != nil {
-			_ins.options().db.Use(_ins)
+		ins = NewGormErrorPlugin(opts...)
+		if ins.options().db != nil {
+			_ = ins.options().db.Use(ins)
 		}
 	})
-	return _ins
+	return ins
 }

@@ -65,7 +65,7 @@ func (c *email) Template(name string) Sender {
 }
 
 func (c *email) initFactory(name string, et config.EmailTemplate) error {
-	if et.Enable != nil && *et.Enable == false {
+	if et.Enable != nil && !*et.Enable {
 		c.delete(name)
 		return nil
 	}

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/xuri/excelize/v2"
+	"google.golang.org/protobuf/proto"
 )
 
 type Writer interface {

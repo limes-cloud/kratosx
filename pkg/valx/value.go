@@ -7,6 +7,11 @@ import (
 	json "github.com/json-iterator/go"
 )
 
+var (
+	emailReg = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(.[a-zA-Z]{2,})+$`)
+	phoneReg = regexp.MustCompile(`^1[3456789]\d{9}$`)
+)
+
 func Transform(in any, dst any) error {
 	b, err := json.Marshal(in)
 	if err != nil {
@@ -16,13 +21,11 @@ func Transform(in any, dst any) error {
 }
 
 func IsEmail(email string) bool {
-	reg := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(.[a-zA-Z]{2,})+$`)
-	return reg.MatchString(email)
+	return emailReg.MatchString(email)
 }
 
 func IsPhone(phone string) bool {
-	reg := regexp.MustCompile(`^1[3456789]\d{9}$`)
-	return reg.MatchString(phone)
+	return phoneReg.MatchString(phone)
 }
 
 func ToUint32(in string) uint32 {

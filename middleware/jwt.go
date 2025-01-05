@@ -40,7 +40,7 @@ func Jwt(conf *config.JWT) middleware.Middleware {
 		} else {
 			method = "GRPC"
 		}
-		return jwtIns.IsWhitelist(path, method) || jwtIns.IsWhitelist(path, method)
+		return jwtIns.IsWhitelist(path, method)
 	}
 
 	return selector.Server(

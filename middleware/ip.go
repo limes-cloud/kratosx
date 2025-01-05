@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport/http"
+	ip2 "github.com/limes-cloud/kratosx/library/ip"
 	"google.golang.org/grpc/peer"
 	"strings"
 )
@@ -29,7 +30,7 @@ func IP() middleware.Middleware {
 					ip = h.Header.Get("x-real-ip")
 				}
 			}
-			ctx = context.WithValue(ctx, "ClientIP", ip)
+			ctx = context.WithValue(ctx, ip2.IPKey{}, ip)
 			return handler(ctx, req)
 		}
 	}

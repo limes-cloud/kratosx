@@ -68,7 +68,7 @@ func Init(cfs map[string]*config.Database, watcher config.Watcher) {
 
 		watcher("database."+key, func(value config.Value) {
 			if err := value.Scan(conf); err != nil {
-				log.Error("Database配置变更失败：%s", err.Error())
+				log.Errorf("Database配置变更失败：%s", err.Error())
 				return
 			}
 			if err := instance.initFactory(key, conf); err != nil {

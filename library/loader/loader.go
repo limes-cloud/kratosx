@@ -77,6 +77,8 @@ func (c *loader) initFactory(name string, path string) error {
 	return nil
 }
 
+// delete 删除指定缓存
+// nolint
 func (c *loader) delete(name string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

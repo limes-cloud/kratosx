@@ -241,6 +241,7 @@ type Http struct {
 	RetryWaitTime    time.Duration
 	MaxRetryWaitTime time.Duration
 	Timeout          time.Duration
+	Server           string
 }
 
 type Client struct {

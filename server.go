@@ -21,9 +21,7 @@ func grpcServer(c *config.GrpcService, count int, so []grpc.ServerOption) *grpc.
 		return grpc.NewServer()
 	}
 	var opts []grpc.ServerOption
-	for _, o := range so {
-		opts = append(opts, o)
-	}
+	opts = append(opts, so...)
 	if c.Network != "" {
 		opts = append(opts, grpc.Network(c.Network))
 	}
@@ -52,9 +50,7 @@ func httpServer(c *config.HttpService, count int, so []http.ServerOption) *http.
 		return http.NewServer()
 	}
 	var opts []http.ServerOption
-	for _, o := range so {
-		opts = append(opts, o)
-	}
+	opts = append(opts, so...)
 	if c.Network != "" {
 		opts = append(opts, http.Network(c.Network))
 	}

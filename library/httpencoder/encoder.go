@@ -9,6 +9,7 @@ import (
 )
 
 // httpResponse 响应结构体
+// nolint
 type httpResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
@@ -45,6 +46,7 @@ func encoderResponse() http.EncodeResponseFunc {
 }
 
 // EncoderError 错误响应封装
+// nolint
 func encoderError() http.EncodeErrorFunc {
 	return func(w stdhttp.ResponseWriter, r *stdhttp.Request, err error) {
 		if err == nil {

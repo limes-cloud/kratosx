@@ -133,20 +133,6 @@ type ctx struct {
 	kratos.AppInfo
 }
 
-type cloneCtx struct {
-	child  context.Context
-	parent context.Context
-}
-
-// MustContext returns the Transport value stored in ctx, if any.
-func MustContext(c context.Context) Context {
-	app, _ := kratos.FromContext(c)
-	return &ctx{
-		Context: c,
-		AppInfo: app,
-	}
-}
-
 // Ctx 获取行下文ctx
 func (c *ctx) Ctx() context.Context {
 	return c.Context
@@ -160,6 +146,7 @@ func (c *ctx) Logger() *log.Helper {
 	return logger.Helper().WithContext(c)
 }
 
+// Transaction 开启层级事物
 func (c *ctx) Transaction(fn func(ctx Context) error, name ...string) error {
 	dbi := db.Instance()
 	if _, ok := c.Value(dbi.TxKey(name...)).(*gorm.DB); ok {
@@ -167,6 +154,7 @@ func (c *ctx) Transaction(fn func(ctx Context) error, name ...string) error {
 	}
 
 	return dbi.Get(name...).WithContext(c.Ctx()).Transaction(func(tx *gorm.DB) error {
+		// nolint
 		cc := context.WithValue(c.Ctx(), dbi.TxKey(name...), tx)
 		return fn(MustContext(cc))
 	})
@@ -175,6 +163,7 @@ func (c *ctx) Transaction(fn func(ctx Context) error, name ...string) error {
 // DB 数据库实例
 func (c *ctx) DB(name ...string) *gorm.DB {
 	dbi := db.Instance()
+	// nolint
 	tx, ok := c.Value(dbi.TxKey(name...)).(*gorm.DB)
 	if ok {
 		return tx
@@ -184,7 +173,7 @@ func (c *ctx) DB(name ...string) *gorm.DB {
 
 // Prometheus 监控
 func (c *ctx) Prometheus() prometheus.Prometheus {
-	return c.Prometheus()
+	return prometheus.Instance()
 }
 
 // Redis 获取缓存实例
@@ -232,7 +221,9 @@ func (c *ctx) Http() http.Request {
 	if !c.Config().IsInit() || c.Config().App().Http == nil {
 		return http.NewDefault(c.Logger())
 	}
-	return http.New(c.Config().App().Http, c.Logger())
+	cfg := c.Config().App().Http
+	cfg.Server = c.Name()
+	return http.New(cfg, c.Logger())
 }
 
 // Token 获取令牌验证器
@@ -274,10 +265,7 @@ func (c *ctx) GrpcConn(srvName string) (*grpc.ClientConn, error) {
 
 // Clone 克隆上下文，上下文中继承了被克隆的值，但是并不会收到上下文的timeout和cancel信号。
 func (c *ctx) Clone() Context {
-	return MustContext(&cloneCtx{
-		child:  context.Background(),
-		parent: c.Context,
-	})
+	return MustContext(context.WithoutCancel(c.Context))
 }
 
 // RegisterBeforeStop 注册服务关闭回调
@@ -309,24 +297,4 @@ func (c *ctx) Err() error {
 
 func (c *ctx) Value(key any) any {
 	return c.Context.Value(key)
-}
-
-func (c *cloneCtx) Ctx() context.Context {
-	return c
-}
-
-func (c *cloneCtx) Deadline() (deadline time.Time, ok bool) {
-	return c.child.Deadline()
-}
-
-func (c *cloneCtx) Done() <-chan struct{} {
-	return c.child.Done()
-}
-
-func (c *cloneCtx) Err() error {
-	return c.child.Err()
-}
-
-func (c *cloneCtx) Value(key any) any {
-	return c.parent.Value(key)
 }

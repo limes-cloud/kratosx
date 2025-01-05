@@ -3,12 +3,12 @@ package initializer
 import (
 	"bufio"
 	"errors"
-	"gorm.io/gorm/clause"
 	"os"
 	"strings"
 	"sync"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Initializer interface {
@@ -44,7 +44,7 @@ func New(db *gorm.DB, path string, force bool) Initializer {
 			force: force,
 			db:    db,
 		}
-		db.AutoMigrate(GormInit{})
+		_ = db.AutoMigrate(GormInit{})
 	})
 	return ins
 }

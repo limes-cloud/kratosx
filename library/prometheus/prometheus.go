@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	_ins *prom
+	ins *prom
 )
 
 type prom struct {
@@ -28,25 +28,29 @@ type Prometheus interface {
 	SummaryVec(name string) *prometheus.SummaryVec
 }
 
+func Instance() Prometheus {
+	return ins
+}
+
 func Init(conf []*config.Prometheus, watcher config.Watcher) {
 	if len(conf) == 0 {
 		return
 	}
 
-	_ins = &prom{
+	ins = &prom{
 		counter:   make(map[string]*prometheus.CounterVec),
 		gauge:     make(map[string]*prometheus.GaugeVec),
 		histogram: make(map[string]*prometheus.HistogramVec),
 		summary:   make(map[string]*prometheus.SummaryVec),
 	}
-	_ins.initFactory(conf)
+	ins.initFactory(conf)
 
 	watcher("prometheus", func(value config.Value) {
 		if err := value.Scan(&conf); err != nil {
 			log.Errorf("prometheus配置变更失败：%s", err.Error())
 			return
 		}
-		_ins.initFactory(conf)
+		ins.initFactory(conf)
 	})
 }
 

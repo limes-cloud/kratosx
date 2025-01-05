@@ -10,6 +10,7 @@ import (
 )
 
 type nodeApplier struct {
+	// nolint
 	canceled int64
 	cancel   context.CancelFunc
 	endpoint *config.Client

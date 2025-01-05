@@ -24,5 +24,5 @@ func TestWriter_WriteRow(t *testing.T) {
 		err := w.WriteRow(test)
 		assert.NoError(t, err)
 	}
-	w.Save()
+	_ = w.Save()
 }

@@ -104,9 +104,9 @@ func (ep *ErrorPlugin) Transform(db *gorm.DB) {
 	}
 
 	// 如果不是从数据库加载，则提前缓存一下
-	// if !ep.opts.enableLoad {
+	//if !ep.opts.enableLoad {
 	//	ep.addInfo(db)
-	// }
+	//}
 
 	// 根据错误码处理错误
 	switch mErr.Number {
@@ -175,31 +175,31 @@ func (ep *ErrorPlugin) options() *options {
 }
 
 // addInfo 重db中提取信息
-func (ep *ErrorPlugin) addInfo(db *gorm.DB) {
-	ep.rw.RLock()
-	if _, is := ep.tables[db.Statement.Table]; is {
-		ep.rw.RUnlock()
-		return
-	}
-	ep.rw.RUnlock()
-
-	if db.Statement.Schema == nil || len(db.Statement.Schema.Fields) == 0 {
-		return
-	}
-
-	// 添加
-	tableComment := ""
-	if tc, ok := db.Statement.Model.(TableComment); ok {
-		tableComment = tc.Comment()
-	}
-
-	ep.rw.Lock()
-	defer ep.rw.Unlock()
-	ep.tables[db.Statement.Table] = Info{Name: db.Statement.Table, Comment: tableComment, Column: map[string]Info{}}
-	for _, field := range db.Statement.Schema.Fields {
-		ep.tables[db.Statement.Table].Column[field.DBName] = Info{Name: field.DBName, Comment: field.Comment}
-	}
-}
+//func (ep *ErrorPlugin) addInfo(db *gorm.DB) {
+//	ep.rw.RLock()
+//	if _, is := ep.tables[db.Statement.Table]; is {
+//		ep.rw.RUnlock()
+//		return
+//	}
+//	ep.rw.RUnlock()
+//
+//	if db.Statement.Schema == nil || len(db.Statement.Schema.Fields) == 0 {
+//		return
+//	}
+//
+//	// 添加
+//	tableComment := ""
+//	if tc, ok := db.Statement.Model.(TableComment); ok {
+//		tableComment = tc.Comment()
+//	}
+//
+//	ep.rw.Lock()
+//	defer ep.rw.Unlock()
+//	ep.tables[db.Statement.Table] = Info{Name: db.Statement.Table, Comment: tableComment, Column: map[string]Info{}}
+//	for _, field := range db.Statement.Schema.Fields {
+//		ep.tables[db.Statement.Table].Column[field.DBName] = Info{Name: field.DBName, Comment: field.Comment}
+//	}
+//}
 
 // table 获取table comment
 func (ep *ErrorPlugin) table(model any, in string) string {

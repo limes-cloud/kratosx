@@ -61,9 +61,9 @@ func ZipDir(dir, output string) error {
 		}
 
 		if !info.IsDir() {
-			file, err := os.Open(path)
-			if err != nil {
-				return err
+			file, er := os.Open(path)
+			if er != nil {
+				return er
 			}
 			defer file.Close()
 			_, err = io.Copy(writer, file)

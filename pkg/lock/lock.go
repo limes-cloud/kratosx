@@ -91,7 +91,8 @@ func (l *lock) AcquireFunc(ctx context.Context, cf func() error, do func() error
 	}
 
 	return func() error {
-		defer l.mux.UnlockContext(ctx)
+		// nolint
+		_, _ = l.mux.UnlockContext(ctx)
 		return do()
 	}()
 }
