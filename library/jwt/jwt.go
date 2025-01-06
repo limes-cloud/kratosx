@@ -37,8 +37,9 @@ type jwt struct {
 
 var (
 	instance *jwt
-	tokenKey struct{}
 )
+
+type tokenKey struct{}
 
 const (
 	blackPrefix  = "token_black"
@@ -147,12 +148,12 @@ func (j *jwt) ParseMapClaims(ctx context.Context) (map[string]any, error) {
 }
 
 func (j *jwt) GetToken(ctx context.Context) string {
-	token, _ := ctx.Value(tokenKey).(string)
+	token, _ := ctx.Value(tokenKey{}).(string)
 	return token
 }
 
 func (j *jwt) SetToken(ctx context.Context, token string) context.Context {
-	return context.WithValue(ctx, tokenKey, token)
+	return context.WithValue(ctx, tokenKey{}, token)
 }
 
 func (j *jwt) Renewal(ctx context.Context) (string, error) {
