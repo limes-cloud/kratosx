@@ -1,6 +1,8 @@
 package pool
 
 import (
+	"context"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/panjf2000/ants/v2"
 
@@ -9,6 +11,7 @@ import (
 
 type Runner interface {
 	Run() error
+	Ctx() context.Context
 }
 
 type Pool interface {
@@ -33,7 +36,7 @@ func Init(conf *config.Pool, watcher config.Watcher) {
 	p, err := ants.NewPoolWithFunc(conf.Size, func(i any) {
 		if run, ok := i.(Runner); ok {
 			if err := run.Run(); err != nil {
-				log.Errorf("协程任务执行失败：%s", err.Error())
+				log.Context(run.Ctx()).Errorf("协程任务执行失败：%s", err.Error())
 			}
 		}
 	},
@@ -65,13 +68,23 @@ func (c *pool) Go(runner Runner) error {
 }
 
 type runner struct {
-	fn func() error
+	ctx context.Context
+	fn  func() error
 }
 
 func (r runner) Run() error {
-	return r.fn()
+	select {
+	case <-r.ctx.Done():
+		return r.ctx.Err()
+	default:
+		return r.fn()
+	}
 }
 
-func AddRunner(fn func() error) Runner {
-	return &runner{fn: fn}
+func (r runner) Ctx() context.Context {
+	return r.ctx
+}
+
+func AddRunner(ctx context.Context, fn func() error) Runner {
+	return &runner{fn: fn, ctx: ctx}
 }
