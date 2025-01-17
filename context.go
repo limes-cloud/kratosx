@@ -9,6 +9,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/metadata"
 	md "github.com/go-kratos/kratos/v2/metadata"
+	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"gorm.io/gorm"
@@ -276,6 +277,18 @@ func (c *ctx) RegisterBeforeStop(name string, fn func()) {
 // RegisterAfterStop 注册服务关闭回调
 func (c *ctx) RegisterAfterStop(name string, fn func()) {
 	stop.Instance().RegisterAfter(name, fn)
+}
+
+// Trace 获取trace id
+func (c *ctx) Trace() string {
+	t, _ := tracing.TraceID()(c.Context).(string)
+	return t
+}
+
+// Span 获取span id
+func (c *ctx) Span() string {
+	t, _ := tracing.SpanID()(c.Context).(string)
+	return t
 }
 
 // Env 获取配置环境
