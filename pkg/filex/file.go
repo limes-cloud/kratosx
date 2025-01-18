@@ -94,7 +94,6 @@ func ZipFiles(output string, files map[string]string) error {
 		if err != nil {
 			panic(err)
 		}
-		defer fileToZip.Close()
 
 		// 获取文件的信息，以便复制文件的元数据
 		info, err := fileToZip.Stat()
@@ -120,6 +119,8 @@ func ZipFiles(output string, files map[string]string) error {
 		if _, err = io.Copy(writer, fileToZip); err != nil {
 			return err
 		}
+
+		_ = fileToZip.Close()
 	}
 	return nil
 }
