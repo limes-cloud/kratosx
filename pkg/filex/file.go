@@ -89,46 +89,43 @@ func ZipFiles(output string, files map[string]string) error {
 
 	// 遍历文件列表，逐个添加到 ZIP 文件
 	for originalName, newName := range filesToZip {
-		// 打开待压缩的文件
-		fileToZip, err := os.Open(originalName)
-		if err != nil {
-			return err
-		}
-
-		err = func() error {
-			defer fileToZip.Close()
-
-			// 获取文件的信息，以便复制文件的元数据
-			info, err := fileToZip.Stat()
-			if err != nil {
-				return err
-			}
-
-			// 创建 ZIP 文件中的一个条目，并指定新的文件名
-			header, err := zip.FileInfoHeader(info)
-			if err != nil {
-				return err
-			}
-			header.Name = newName
-			header.Method = zip.Deflate // 设置压缩算法
-
-			// 创建条目的写入器
-			writer, err := zipWriter.CreateHeader(header)
-			if err != nil {
-				return err
-			}
-
-			// 将文件内容复制到 ZIP 文件中的条目
-			if _, err = io.Copy(writer, fileToZip); err != nil {
-				return err
-			}
-
-			return nil
-		}()
-
-		if err != nil {
+		if err := addFileToZip(zipWriter, originalName, newName); err != nil {
 			return err
 		}
 	}
+
 	return nil
+}
+
+func addFileToZip(zipWriter *zip.Writer, originalName, newName string) error {
+	// 打开待压缩的文件
+	fileToZip, err := os.Open(originalName)
+	if err != nil {
+		return err
+	}
+	defer fileToZip.Close()
+
+	// 获取文件的信息，以便复制文件的元数据
+	info, err := fileToZip.Stat()
+	if err != nil {
+		return err
+	}
+
+	// 创建 ZIP 文件中的一个条目，并指定新的文件名
+	header, err := zip.FileInfoHeader(info)
+	if err != nil {
+		return err
+	}
+	header.Name = newName
+	header.Method = zip.Deflate // 设置压缩算法
+
+	// 创建条目的写入器
+	writer, err := zipWriter.CreateHeader(header)
+	if err != nil {
+		return err
+	}
+
+	// 将文件内容复制到 ZIP 文件中的条目
+	_, err = io.Copy(writer, fileToZip)
+	return err
 }
