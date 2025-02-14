@@ -19,6 +19,7 @@ require (
 	github.com/gorilla/handlers v1.5.2
 	github.com/hashicorp/consul/api v1.26.1
 	github.com/jinzhu/now v1.1.5
+	github.com/joho/godotenv v1.5.1
 	github.com/json-iterator/go v1.1.12
 	github.com/mbndr/figlet4go v0.0.0-20190224160619-d6cef5b186ea
 	github.com/mitchellh/mapstructure v1.5.0

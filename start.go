@@ -3,6 +3,7 @@ package kratosx
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/config/file"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library"
+	"github.com/limes-cloud/kratosx/library/env"
 	"github.com/limes-cloud/kratosx/library/logger"
 	"github.com/limes-cloud/kratosx/library/pprof"
 	"github.com/limes-cloud/kratosx/library/registry"
@@ -24,14 +26,22 @@ const (
 )
 
 var (
-	envName    = os.Getenv(AppName)
-	envVersion = os.Getenv(AppVersion)
-	id, _      = os.Hostname()
+	envName    string
+	envVersion string
+	id         string
 )
 
-func New(opts ...Option) *kratos.App {
+func init() {
+	env.Load()
+
+	envName = os.Getenv(AppName)
+	envVersion = os.Getenv(AppVersion)
+	id, _ = os.Hostname()
+}
+
+func Init(opts ...Option) func() *options {
 	o := &options{
-		config: config.New(file.NewSource("internal/conf/conf.yaml")),
+		config: config.New(file.NewSource(filepath.Join(env.RootDir(), "internal/conf/conf.yaml"))),
 	}
 
 	for _, opt := range opts {
@@ -60,6 +70,14 @@ func New(opts ...Option) *kratos.App {
 	}
 
 	library.Init(o.config, o.loggerFields)
+
+	return func() *options {
+		return o
+	}
+}
+
+func New(opts ...Option) *kratos.App {
+	o := Init(opts...)()
 
 	// 获取中间件
 	defOpts := []kratos.Option{
