@@ -20,11 +20,6 @@ import (
 	"github.com/limes-cloud/kratosx/library/stop"
 )
 
-const (
-	AppName    = "APP_NAME"
-	AppVersion = "APP_VERSION"
-)
-
 var (
 	envName    string
 	envVersion string
@@ -34,8 +29,8 @@ var (
 func init() {
 	env.Load()
 
-	envName = os.Getenv(AppName)
-	envVersion = os.Getenv(AppVersion)
+	envName = env.GetAppName()
+	envVersion = env.GetAppVersion()
 	id, _ = os.Hostname()
 }
 
@@ -58,12 +53,23 @@ func Init(opts ...Option) func() *options {
 		o.config.SetAppInfo(id, envName, envVersion)
 	}
 
+	// 重置应用名称
+	if envName == "" {
+		env.SetAppName(o.config.App().Name)
+		envName = o.config.App().Name
+	}
+	// 重置应用版本
+	if envVersion == "" {
+		env.SetAppVersion(o.config.App().Version)
+		envVersion = o.config.App().Version
+	}
+
 	// 插件初始化
 	if o.loggerFields == nil {
 		o.loggerFields = logger.LogField{
-			"id":      o.config.App().ID,
-			"name":    o.config.App().Name,
-			"version": o.config.App().Version,
+			"id":      id,
+			"name":    envName,
+			"version": envVersion,
 			"trace":   tracing.TraceID(),
 			"span":    tracing.SpanID(),
 		}

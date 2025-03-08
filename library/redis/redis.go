@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	goRedis "github.com/go-redis/redis/v8"
+
 	"github.com/limes-cloud/kratosx/config"
 )
 

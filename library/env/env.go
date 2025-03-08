@@ -8,6 +8,11 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const (
+	appName    = "APP_NAME"
+	appVersion = "APP_VERSION"
+)
+
 // RootDir 获取项目根目录
 func RootDir() string {
 	path, _ := os.Getwd()
@@ -61,4 +66,30 @@ func Load() {
 	if err := godotenv.Load(filepath.Join(path, ".env")); err != nil {
 		log.Printf("load env error %s", err.Error())
 	}
+}
+
+// GetAppName 获取应用名称
+func GetAppName() string {
+	return os.Getenv(appName)
+}
+
+// SetAppName 设置应用名称
+func SetAppName(val string) {
+	_ = os.Setenv(appName, val)
+}
+
+// GetAppVersion 获取应用版本
+func GetAppVersion() string {
+	return os.Getenv(appVersion)
+}
+
+// SetAppVersion 设置应用版本
+func SetAppVersion(val string) {
+	_ = os.Setenv(appVersion, val)
+}
+
+// GetHostName 获取应用版本
+func GetHostName() string {
+	id, _ := os.Hostname()
+	return id
 }
