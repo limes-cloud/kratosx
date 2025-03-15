@@ -32,14 +32,13 @@ func Jwt(conf *config.JWT) middleware.Middleware {
 
 		if tr, ok := transport.FromServerContext(ctx); ok {
 			path = tr.Operation()
-		}
-		h, is := http.RequestFromServerContext(ctx)
-		if is {
-			path = h.URL.Path
-			method = h.Method
-		} else {
 			method = "GRPC"
 		}
+		if h, is := http.RequestFromServerContext(ctx); is {
+			path = h.URL.Path
+			method = h.Method
+		}
+
 		return jwtIns.IsWhitelist(path, method)
 	}
 
