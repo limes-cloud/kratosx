@@ -20,6 +20,7 @@ import (
 type Jwt interface {
 	NewToken(m map[string]any) (string, error)
 	Parse(ctx context.Context, dst any) error
+	ParseByToken(token string, dst any) error
 	ParseMapClaims(ctx context.Context) (map[string]any, error)
 	IsWhitelist(path, method string) bool
 	IsBlacklist(token string) bool
@@ -110,6 +111,26 @@ func (j *jwt) Parse(ctx context.Context, dst any) error {
 	if err != nil {
 		return err
 	}
+	body, err := json.Marshal(claims)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, dst)
+}
+
+func (j *jwt) ParseByToken(token string, dst any) error {
+	tokenInfo, _ := jwtv5.Parse(token, func(token *jwtv5.Token) (any, error) {
+		return []byte(j.conf.Secret), nil
+	})
+	if tokenInfo == nil || tokenInfo.Claims == nil {
+		return errors.New("token parse error")
+	}
+
+	claims, is := tokenInfo.Claims.(jwtv5.MapClaims)
+	if !is {
+		return errors.New("token format error")
+	}
+
 	body, err := json.Marshal(claims)
 	if err != nil {
 		return err

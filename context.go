@@ -189,7 +189,7 @@ func (c *ctx) Go(runner pool.Runner) error {
 
 // WaitRunner 获取并发池等待实例
 func (c *ctx) WaitRunner(opts ...pool.WaitRunnerOptionFunc) pool.WaitRunner {
-	return pool.NewWaitRunner(opts...)
+	return pool.NewWaitRunner(c.Ctx(), opts...)
 }
 
 // Loader 获加载器实例
