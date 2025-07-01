@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"github.com/limes-cloud/kratosx/library/db/model"
 	"sync"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -132,7 +133,7 @@ func (d *db) initFactory(name string, conf *config.Database) error {
 	}
 
 	if conf.Config.Initializer != nil && conf.Config.Initializer.Enable {
-		if err := initializer.New(client, conf.Config.Initializer.Path, conf.Config.Initializer.Force).Exec(); err != nil {
+		if err := initializer.New(model.DatabaseType(conf.Drive), client, conf.Config.Initializer.Path, conf.Config.Initializer.Force).Exec(); err != nil {
 			panic("db init error:" + err.Error())
 		}
 	}
@@ -229,8 +230,8 @@ func (d *db) open(conf *config.Database) gorm.Dialector {
 
 func (d *db) create(conf *config.Database) error {
 	copyConf := *conf
-	copyConf.Connect.DBName = ""
-	copyConf.Connect.Option = ""
+	//copyConf.Connect.DBName = ""
+	//copyConf.Connect.Option = ""
 
 	connect, err := gorm.Open(d.open(&copyConf))
 	if err != nil {
