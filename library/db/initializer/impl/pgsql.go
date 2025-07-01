@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/limes-cloud/kratosx/library/db/model"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"os"
 	"strings"
 )
@@ -55,23 +54,29 @@ func (p *pgsqlInitializer) Exec() error {
 	var sb strings.Builder
 
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "--") || line == "" {
+		line := scanner.Text()
+
+		// 忽略事务
+		if line == "BEGIN;" || line == "COMMIT;" {
+			continue
+		}
+		// 如果是注释或空行则跳过
+		if strings.HasPrefix(line, "--") || strings.HasPrefix(line, "/*") || len(strings.TrimSpace(line)) == 0 {
 			continue
 		}
 
-		// PostgreSQL-specific processing
-		// Remove any MySQL-specific syntax if present in the SQL file
-		line = strings.ReplaceAll(line, "`", "\"") // Replace backticks with double quotes
-		sb.WriteString(line)
-		sb.WriteString(" ") // Add space between lines
+		sb.WriteString(line + "\n")
 
-		// Check for statement termination (PostgreSQL uses semicolons too)
-		if strings.HasSuffix(strings.TrimRight(line, " "), ";") {
+		// 如果SQL语句以分号结尾，则执行
+		if strings.HasSuffix(line, ";") {
 			sql := sb.String()
 			sb.Reset()
 
-			if err := tx.Exec(sql).Error; err != nil {
+			if strings.Contains(sql, "gorm_init") {
+				continue
+			}
+
+			if err = tx.Exec(sql).Error; err != nil {
 				tx.Rollback()
 				return err
 			}
@@ -83,14 +88,4 @@ func (p *pgsqlInitializer) Exec() error {
 		return err
 	}
 	return tx.Commit().Error
-}
-
-func (p *pgsqlInitializer) MarkInitialized(tx *gorm.DB) error {
-	return tx.Model(&model.GormInit{}).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		UpdateAll: true,
-	}).Create(map[string]interface{}{
-		"id":   1,
-		"init": 1, // 直接使用整数 1 代替 true
-	}).Error
 }
