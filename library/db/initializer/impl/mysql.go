@@ -57,7 +57,8 @@ func (m *mysqlInitializer) Exec() error {
 	// 4. 逐行处理SQL
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "--") || line == "" {
+		// 如果是注释或空行则跳过
+		if strings.HasPrefix(line, "--") || strings.HasPrefix(line, "/*") || len(strings.TrimSpace(line)) == 0 {
 			continue
 		}
 
@@ -69,6 +70,9 @@ func (m *mysqlInitializer) Exec() error {
 			sql := sb.String()
 			sb.Reset()
 
+			if strings.Contains(sql, "gorm_init") {
+				continue
+			}
 			if err := tx.Exec(sql).Error; err != nil {
 				tx.Rollback()
 				return err
