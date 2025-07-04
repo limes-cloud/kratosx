@@ -15,9 +15,7 @@ import (
 	adapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/metadata"
-	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	"github.com/go-redis/redis/v8"
-	jwtv5 "github.com/golang-jwt/jwt/v5"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/db"
@@ -29,7 +27,6 @@ type Authentication interface {
 	RemoveWhitelist(path, method string)
 	IsWhitelist(path string, method string) bool
 	Auth(role, path, method string) bool
-	GetRole(ctx context.Context) (string, error)
 	Enforce() *casbin.Enforcer
 	IsSkipRole(role string) bool
 	SetAuth(req *http.Request, data string)
@@ -211,23 +208,6 @@ func (a *authentication) Auth(role, path, method string) bool {
 	// 进行鉴权
 	is, _ := a.enforcer.Enforce(role, path, method)
 	return is
-}
-
-func (a *authentication) GetRole(ctx context.Context) (string, error) {
-	tokenInfo, is := kratosJwt.FromContext(ctx)
-	if !is { // 跳过jwt白名单的也不检测
-		return "", nil
-	}
-	claims, is := tokenInfo.(jwtv5.MapClaims)
-	if !is {
-		return "", errors.New("token format error")
-	}
-
-	role, is := claims[a.roleKey].(string)
-	if !is {
-		return "", fmt.Errorf("not exist role field %v", a.roleKey)
-	}
-	return role, nil
 }
 
 func (a *authentication) Enforce() *casbin.Enforcer {

@@ -37,3 +37,18 @@ func ToInt64(in string) int64 {
 	val, _ := strconv.ParseInt(in, 10, 64)
 	return val
 }
+
+func Unique[T ListType](list []T) []T {
+	var (
+		r []T
+		m = make(map[T]struct{})
+	)
+	for _, item := range list {
+		if _, ok := m[item]; ok {
+			continue
+		}
+		r = append(r, item)
+		m[item] = struct{}{}
+	}
+	return r
+}
