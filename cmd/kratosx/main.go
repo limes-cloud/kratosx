@@ -10,7 +10,6 @@ import (
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/proto"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/run"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/upgrade"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/webutil"
 )
 
 var rootCmd = &cobra.Command{
@@ -26,7 +25,6 @@ func init() {
 	rootCmd.AddCommand(upgrade.CmdUpgrade)
 	rootCmd.AddCommand(change.CmdChange)
 	rootCmd.AddCommand(run.CmdRun)
-	rootCmd.AddCommand(webutil.CmdWebUtil)
 }
 
 func main() {

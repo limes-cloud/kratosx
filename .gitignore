@@ -37,3 +37,6 @@ bin/
 .vscode/
 .idea/
 *.swp
+
+# 测试
+example

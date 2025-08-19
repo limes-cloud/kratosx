@@ -8,7 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kratos/kratos/v2/log"
+	"github.com/limes-cloud/kratosx/library/logger"
+
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	jwtv5 "github.com/golang-jwt/jwt/v5"
 	json "github.com/json-iterator/go"
@@ -37,7 +38,9 @@ type jwt struct {
 }
 
 var (
-	instance *jwt
+	ins *jwt
+
+	once sync.Once
 )
 
 type tokenKey struct{}
@@ -49,25 +52,27 @@ const (
 
 // Instance 获取email对象实例
 func Instance() Jwt {
-	return instance
+	return ins
 }
 
+// Init 初始化
 func Init(conf *config.JWT, watcher config.Watcher) {
 	if conf == nil {
 		return
 	}
 
-	instance = &jwt{conf: conf}
+	once.Do(func() {
+		ins = &jwt{conf: conf}
 
-	watcher("jwt", func(value config.Value) {
-		if err := value.Scan(conf); err != nil {
-			log.Errorf("JWT 配置变更失败：%s", err.Error())
-			return
-		}
+		watcher("jwt", func(value config.Value) {
+			ins.rw.Lock()
+			defer ins.rw.Unlock()
 
-		instance.rw.Lock()
-		defer instance.rw.Unlock()
-		instance.conf = conf
+			if err := value.Scan(&ins.rw); err != nil {
+				logger.Instance().Info("jwt config watch error", logger.F("err", err))
+				return
+			}
+		})
 	})
 }
 
@@ -106,6 +111,7 @@ func (j *jwt) NewToken(m map[string]any) (string, error) {
 	return token, nil
 }
 
+// Parse 解析token
 func (j *jwt) Parse(ctx context.Context, dst any) error {
 	claims, err := j.ParseMapClaims(ctx)
 	if err != nil {
@@ -118,6 +124,7 @@ func (j *jwt) Parse(ctx context.Context, dst any) error {
 	return json.Unmarshal(body, dst)
 }
 
+// ParseByToken 解析指定的token
 func (j *jwt) ParseByToken(token string, dst any) error {
 	tokenInfo, _ := jwtv5.Parse(token, func(token *jwtv5.Token) (any, error) {
 		return []byte(j.conf.Secret), nil
@@ -138,6 +145,7 @@ func (j *jwt) ParseByToken(token string, dst any) error {
 	return json.Unmarshal(body, dst)
 }
 
+// ParseMapClaims 解析token到map
 func (j *jwt) ParseMapClaims(ctx context.Context) (map[string]any, error) {
 	tokenInfo, is := kratosJwt.FromContext(ctx)
 	if !is {
@@ -168,15 +176,18 @@ func (j *jwt) ParseMapClaims(ctx context.Context) (map[string]any, error) {
 	return claims, nil
 }
 
+// GetToken 从ctx中获取token
 func (j *jwt) GetToken(ctx context.Context) string {
 	token, _ := ctx.Value(tokenKey{}).(string)
 	return token
 }
 
+// SetToken 设置token的值到当前的ctx
 func (j *jwt) SetToken(ctx context.Context, token string) context.Context {
 	return context.WithValue(ctx, tokenKey{}, token)
 }
 
+// Renewal token续期
 func (j *jwt) Renewal(ctx context.Context) (string, error) {
 	token := j.GetToken(ctx)
 	if token == "" {
@@ -213,6 +224,7 @@ func (a *jwt) path(path, method string) string {
 	return fmt.Sprintf("%s:%s", path, method)
 }
 
+// IsWhitelist 判断请求的接口是否在白名单内
 func (j *jwt) IsWhitelist(path, method string) bool {
 	j.rw.RLock()
 	defer j.rw.RUnlock()
@@ -242,6 +254,7 @@ func (j *jwt) IsWhitelist(path, method string) bool {
 	return false
 }
 
+// IsBlacklist 判断token是否在黑名单
 func (j *jwt) IsBlacklist(token string) bool {
 	rd := redis.Instance().Get(j.conf.Redis)
 	if rd == nil {
@@ -251,16 +264,19 @@ func (j *jwt) IsBlacklist(token string) bool {
 	return is
 }
 
+// AddBlacklist 添加token进入黑名单
 func (j *jwt) AddBlacklist(token string) {
 	rd := redis.Instance().Get(j.conf.Redis)
 	rd.HSet(context.Background(), blackPrefix, token, 1, j.conf.Expire)
 }
 
+// setUnique 设置当前token为unique token
 func (j *jwt) setUnique(key, token string) {
 	rd := redis.Instance().Get(j.conf.Redis)
 	rd.HSet(context.Background(), uniquePrefix, key, token, j.conf.Expire)
 }
 
+// CompareUniqueToken 对比是否时unique key
 func (j *jwt) CompareUniqueToken(key, token string) bool {
 	rd := redis.Instance().Get(j.conf.Redis)
 	res, _ := rd.HGet(context.Background(), uniquePrefix, key).Result()

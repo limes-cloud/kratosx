@@ -2,6 +2,7 @@ package gormtranserror
 
 import (
 	"errors"
+
 	"gorm.io/gorm"
 )
 

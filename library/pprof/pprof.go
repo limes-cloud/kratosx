@@ -9,7 +9,7 @@ import (
 	"github.com/limes-cloud/kratosx/config"
 )
 
-func PprofServer(conf *config.Pprof, srv *thttp.Server) {
+func Server(conf *config.Pprof, srv *thttp.Server) {
 	secret := conf.Secret
 	query := conf.Query
 

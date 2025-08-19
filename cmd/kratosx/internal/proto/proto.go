@@ -1,10 +1,10 @@
 package proto
 
 import (
+	"github.com/spf13/cobra"
+
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/proto/add"
 	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/proto/client"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/proto/server"
-	"github.com/spf13/cobra"
 )
 
 // CmdProto represents the proto command.
@@ -17,5 +17,4 @@ var CmdProto = &cobra.Command{
 func init() {
 	CmdProto.AddCommand(add.CmdAdd)
 	CmdProto.AddCommand(client.CmdClient)
-	CmdProto.AddCommand(server.CmdServer)
 }

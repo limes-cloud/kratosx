@@ -4,38 +4,39 @@ import (
 	"time"
 )
 
+// App 配置结构体
 type App struct {
-	ID      string
-	Name    string
-	Version string
-	Env     string
-	Server  *struct {
-		Count    int
-		Registry *string
-		Http     *HttpService
-		Grpc     *GrpcService
-		Tls      *Tls
+	ID      string    // 唯一ID
+	Name    string    // 应用名称
+	Version string    // 应用版本
+	Env     string    // 环境
+	Server  *struct { // 服务配置
+		Count    int          // 服务数量
+		Registry *string      // 服务注册中心
+		Http     *HttpService // HTTP服务
+		Grpc     *GrpcService // GRPC服务
+		TLS      *TLS         // TLS配置
 	}
-	Signature      *Signature
-	Log            *Logger
-	Pool           *Pool
-	Email          *Email
-	JWT            *JWT
-	Http           *Http
-	Logging        *Logging
-	Authentication *Authentication
-	Tracing        *Tracing
-	Client         []*Client
-	Database       map[string]*Database
-	Redis          map[string]*Redis
-	Loader         map[string]string
-	Captcha        map[string]*Captcha
-	RateLimit      bool
-	Metrics        bool
-	Prometheus     []*Prometheus
+	Signature      *Signature          // 签名配置
+	Logger         *Logger             // 日志配置
+	Pool           *Pool               // 连接池配置
+	Email          *Email              // 邮件配置
+	JWT            *JWT                // JWT配置
+	Request        *Request            // http request配置
+	Logging        *Logging            // 日志记录配置
+	Authentication *Authentication     // 认证配置
+	Tracing        *Tracing            // 链路追踪配置
+	Client         []*Client           // 客户端配置
+	Database       []*Database         // 数据库配置
+	Redis          []*Redis            // Redis配置
+	Loader         map[string]string   // 加载器配置
+	Captcha        map[string]*Captcha // 验证码配置
+	RateLimit      bool                // 限流配置
+	Metrics        bool                // 指标配置
+	Prometheus     []*Prometheus       // Prometheus配置
 }
 
-type Tls struct {
+type TLS struct {
 	Name string
 	Ca   string
 	Pem  string
@@ -44,7 +45,6 @@ type Tls struct {
 
 type GrpcService struct {
 	Network        string
-	Addr           string
 	Host           string
 	Port           int
 	MaxRecvSize    int
@@ -54,7 +54,6 @@ type GrpcService struct {
 
 type HttpService struct {
 	Network        string
-	Addr           string
 	Host           string
 	Port           int
 	Timeout        time.Duration
@@ -63,6 +62,7 @@ type HttpService struct {
 	Cors           *Cors
 	Marshal        *Marshal
 	Pprof          *Pprof
+	WebServerDir   string
 }
 
 type Pprof struct {
@@ -72,6 +72,7 @@ type Pprof struct {
 
 type Database struct {
 	Enable     bool
+	Name       string
 	Drive      string
 	AutoCreate bool
 	Connect    DBConnect
@@ -125,11 +126,11 @@ type Redis struct {
 }
 
 type Pool struct {
-	Size             int
-	ExpiryDuration   time.Duration
-	PreAlloc         bool
-	MaxBlockingTasks int
-	Nonblocking      bool
+	Size             int           // 最大协程数量
+	ExpiryDuration   time.Duration // 过期时间
+	PreAlloc         bool          // 是否预分配
+	MaxBlockingTasks int           // 最大的并发任务
+	Nonblocking      bool          // 设置为true时maxBlockingTasks将失效，不限制并发任务
 }
 
 type Email struct {
@@ -150,17 +151,12 @@ type EmailTemplate struct {
 }
 
 type Captcha struct {
-	Type     string
-	Length   int
-	Expire   time.Duration
-	Redis    string
-	Height   int
-	Width    int
-	Skew     float64
-	DotCount int
-	Refresh  bool
-	IpLimit  int
-	Template string
+	Length       int
+	Expire       time.Duration
+	Redis        string
+	RefreshTime  time.Duration
+	Limit        int
+	UniqueDevice bool
 }
 
 type Logging struct {
@@ -190,20 +186,22 @@ type Authentication struct {
 	SkipRole   []string
 }
 
+type LoggerFile struct {
+	ErrorAlone bool          `json:"errorAlone"` // 错误日志单独输出
+	Name       string        `json:"name"`       // 日志文件名
+	SplitTime  time.Duration `json:"splitTime"`  // 日志切割时间间隔
+	MaxAge     time.Duration `json:"maxAge"`     // 备份文件最大保存时间
+	MaxBackup  int           `json:"maxBackup"`  // 备份文件最大个数，MaxAge可能仍会导致它们被删除。
+}
+
 type Logger struct {
-	Level      int8
-	Output     []string
-	EnCoder    string
-	Caller     bool
-	CallerSkip *int
-	File       *struct {
-		Name      string
-		MaxSize   int
-		MaxBackup int
-		MaxAge    int
-		Compress  bool
-		LocalTime bool
-	}
+	Level      int8        `json:"level"`      // 日志等级 0：info 1:warning 2:error
+	Output     []string    `json:"output"`     // 输出位置，支持 stdout,file
+	EnCoder    string      `json:"enCoder"`    // 编码器类型 json,console
+	Caller     bool        `json:"caller"`     // 显示调用者信息，默认不显示
+	CallerSkip int         `json:"callerSkip"` // 调用者层级，默认 2
+	HookStd    bool        `json:"hookStd"`    // 开启劫持标准输出
+	File       *LoggerFile `json:"file"`       // 日志文件配置
 }
 
 type Tracing struct {
@@ -237,13 +235,13 @@ type Signature struct {
 	Expire    time.Duration
 }
 
-type Http struct {
-	EnableLog        bool
-	RetryCount       int
-	RetryWaitTime    time.Duration
-	MaxRetryWaitTime time.Duration
-	Timeout          time.Duration
-	Server           string
+type Request struct {
+	EnableLog        bool          `json:"enableLog"`        // 是否开启请求日志
+	RetryCount       int           `json:"retryCount"`       // 最大重试次数
+	RetryWaitTime    time.Duration `json:"retryWaitTime"`    // 重试等待时间
+	MaxRetryWaitTime time.Duration `json:"maxRetryWaitTime"` // 最大重试等待时间
+	Timeout          time.Duration `json:"timeout"`          // 请求超时时间
+	UserAgent        string        `json:"userAgent"`        // 请求服务名称，UA
 }
 
 type Client struct {
@@ -253,7 +251,7 @@ type Client struct {
 	Metadata  map[string]string
 	Backends  []Backend
 	Signature *Signature
-	Tls       *Tls
+	TLS       *TLS
 }
 
 type Backend struct {

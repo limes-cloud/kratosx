@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/panjf2000/ants/v2"
 
 	"github.com/limes-cloud/kratosx/config"
@@ -18,57 +17,83 @@ type Runner interface {
 }
 
 type Pool interface {
+	// WithContext 返回一个上下文
+	WithContext(ctx context.Context) Pool
+
+	// Go 执行任务
 	Go(runner Runner) error
+
+	// GoFunc 执行函数任务
+	GoFunc(fn func()) error
+
+	// NewWaitRunner 创建等待协程任务
+	NewWaitRunner(opts ...WaitRunnerOptionFunc) WaitRunner
 }
 
 type pool struct {
-	pf *ants.PoolWithFunc
+	pf  *ants.PoolWithFunc
+	ctx context.Context
 }
 
 var (
-	ins *pool
+	ins  *pool
+	once sync.Once
 )
 
+const (
+	poolSize             = 100000
+	poolMaxBlockingTasks = 10000
+)
+
+// Instance 获取全局日志器
 func Instance() Pool {
 	return ins
 }
 
-func Init(conf *config.Pool, watcher config.Watcher) {
+// Init 初始化协程
+func Init(conf *config.Pool) {
 	if conf == nil {
 		return
 	}
 
-	p, err := ants.NewPoolWithFunc(conf.Size, func(i any) {
-		if run, ok := i.(Runner); ok {
-			run.Run()
+	once.Do(func() {
+		if conf.Size == 0 {
+			conf.Size = poolSize
 		}
-	},
-		ants.WithExpiryDuration(conf.ExpiryDuration),
-		ants.WithMaxBlockingTasks(conf.MaxBlockingTasks),
-		ants.WithNonblocking(conf.Nonblocking),
-		ants.WithPreAlloc(conf.PreAlloc),
-	)
-	if err != nil {
-		panic("协程池初始化失败：" + err.Error())
-	}
+		if conf.MaxBlockingTasks == 0 {
+			conf.MaxBlockingTasks = poolMaxBlockingTasks
+		}
 
-	ins = &pool{pf: p}
-
-	watcher("pool.size", func(value config.Value) {
-		size, err := value.Int()
+		p, err := ants.NewPoolWithFunc(conf.Size, func(i any) {
+			if run, ok := i.(Runner); ok {
+				run.Run()
+			}
+		},
+			ants.WithExpiryDuration(conf.ExpiryDuration),
+			ants.WithMaxBlockingTasks(conf.MaxBlockingTasks),
+			ants.WithNonblocking(conf.Nonblocking),
+			ants.WithPreAlloc(conf.PreAlloc),
+		)
 		if err != nil {
-			log.Errorf("Pool配置变更失败：%s", err.Error())
-			return
+			panic("协程池初始化失败：" + err.Error())
 		}
-		if size != 0 {
-			ins.pf.Tune(int(size))
-		}
+		ins = &pool{pf: p, ctx: context.Background()}
 	})
 }
 
+// GoFunc 执行函数任务
+func (p *pool) GoFunc(fn func()) error {
+	return p.pf.Invoke(AddRunner(p.ctx, fn))
+}
+
 // Go 执行协程任务
-func (c *pool) Go(runner Runner) error {
-	return c.pf.Invoke(runner)
+func (p *pool) Go(runner Runner) error {
+	return p.pf.Invoke(runner)
+}
+
+// WithContext 载入业务ctx
+func (p *pool) WithContext(ctx context.Context) Pool {
+	return &pool{pf: p.pf, ctx: ctx}
 }
 
 type runner struct {
@@ -92,9 +117,16 @@ func AddRunner(ctx context.Context, fn func()) Runner {
 }
 
 type WaitRunner interface {
+	// AddTasks 批量添加协程任务
 	AddTasks(f ...func() error)
+
+	// AddTask 添加协程任务
 	AddTask(f func() error)
+
+	// Wait 等待协程任务执行完成
 	Wait() error
+
+	// ErrorList 获取协程任务执行错误列表
 	ErrorList() []error
 }
 
@@ -157,7 +189,7 @@ func WithRetryWaitTimeOption(duration time.Duration) WaitRunnerOptionFunc {
 func (w *waitTask) Run() {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Helper().WithContext(w.runner.ctx).Errorw("exec task error", r)
+			logger.Instance().WithContext(w.runner.ctx).Error("exec task error", logger.F("err", r))
 		}
 		w.runner.size.Add(-1)
 		w.runner.wg.Done()
@@ -195,7 +227,7 @@ func (w *waitTask) Run() {
 }
 
 // NewWaitRunner 创建等待协程任务
-func NewWaitRunner(ctx context.Context, opts ...WaitRunnerOptionFunc) WaitRunner {
+func (p *pool) NewWaitRunner(opts ...WaitRunnerOptionFunc) WaitRunner {
 	opt := &WaitRunnerOption{
 		max:        -1,
 		errorBreak: false,
@@ -206,7 +238,7 @@ func NewWaitRunner(ctx context.Context, opts ...WaitRunnerOptionFunc) WaitRunner
 	}
 
 	return &waitRunner{
-		ctx:     ctx,
+		ctx:     p.ctx,
 		options: opt,
 		wg:      sync.WaitGroup{},
 		size:    atomic.Int32{},

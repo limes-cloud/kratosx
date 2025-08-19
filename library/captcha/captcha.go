@@ -8,227 +8,290 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
-	"sync"
+	"strings"
 	"time"
 
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/mojocn/base64Captcha"
-
-	"github.com/limes-cloud/kratosx/config"
-	"github.com/limes-cloud/kratosx/library/email"
-	"github.com/limes-cloud/kratosx/library/redis"
+	"github.com/redis/go-redis/v9"
 )
 
+type GetCaptchaRequest struct {
+	Scene    string // 验证码场景
+	ClientIP string // 客户端IP地址
+	User     string // 用户标识
+}
+
+type GetCaptchaResponse struct {
+	UUID       string // 验证码唯一标识
+	VerifyCode string // 验证码内容
+}
+
+type VerifyCaptchaRequest struct {
+	Scene      string // 验证码场景
+	ClientIP   string // 客户端IP地址
+	User       string // 用户标识
+	UUID       string // 验证码唯一标识
+	VerifyCode string // 验证码内容
+}
+
+// Captcha 验证码接口能力
 type Captcha interface {
-	Email(tp string, ip string, to string) (Response, error)
-	Image(tp string, ip string) (Response, error)
-	VerifyEmail(tp, ip, id, answer, email string) error
-	VerifyImage(tp, ip, id, answer string) error
+	// GetCaptchaDuration 获取验证码有效期
+	GetCaptchaDuration() time.Duration
+
+	// GetCaptcha 获取验证码
+	GetCaptcha(req *GetCaptchaRequest) (*GetCaptchaResponse, error)
+
+	// CancelCaptcha 取消验证码
+	CancelCaptcha(uuid string) error
+
+	// VerifyCaptcha 验证验证码(不同limit)
+	VerifyCaptcha(req *VerifyCaptchaRequest) error
+
+	// IsLimitError 判断是否超过最大获取验证码次数
+	IsLimitError(err error) bool
+
+	// IsDupError 判断是否重复请求验证码
+	IsDupError(err error) bool
+
+	// IsInvalidCaptchaError 判断是否验证码无效
+	IsInvalidCaptchaError(err error) bool
 }
 
 type captcha struct {
-	mu  sync.RWMutex
-	set map[string]*config.Captcha
+	ctx            context.Context
+	redis          *redis.Client
+	limit          int           // 验证码在指定ip下的每日最大获取次数
+	length         int           // 验证码长度
+	expire         time.Duration // 验证码过期时间
+	refreshTime    time.Duration // 刷新等待时间
+	uniqueDevice   bool          // 是否唯一设备
+	verifiedDelete bool          // 验证码验证成功后是否删除
 }
 
-type Sender struct {
-	UUID string
-	Send func(conf *config.Captcha, answer string, expire time.Duration) (string, error)
-}
-
-var instance *captcha
-
-const (
-	imageType = "image"
-	emailType = "email"
+var (
+	// 这里两个error 上层调用方可能需要更具具体的error信息来处理业务。
+	// 所以这里定义为全局变量，提供判断代码进行调用
+	errorLimit          = errors.New("当前IP已超过最大获取验证码次数")
+	errorDup            = errors.New("请勿重复请求验证码")
+	errorInvalidCaptcha = errors.New("无效的验证码")
 )
 
-func Instance() Captcha {
-	return instance
-}
+const (
+	captchaDefaultLimit          = 50
+	captchaDefaultLength         = 4
+	captchaDefaultExpireTime     = 10 * time.Minute
+	captchaDefaultRefreshTime    = 1 * time.Minute
+	captchaDefaultUniqueDevice   = false
+	captchaDefaultVerifiedDelete = false
+)
 
-func Init(cfs map[string]*config.Captcha, watcher config.Watcher) {
-	if len(cfs) == 0 {
-		return
-	}
+type OptionFunc func(*captcha)
 
-	instance = &captcha{set: cfs}
-
-	for key, conf := range cfs {
-		if conf == nil {
-			continue
-		}
-
-		instance.initFactory(key, conf)
-
-		watcher("captcha."+key, func(value config.Value) {
-			if err := value.Scan(conf); err != nil {
-				log.Errorf("Captcha 配置变更失败：%s", err.Error())
-				return
-			}
-			instance.initFactory(key, conf)
-		})
+// WithLimit 设置每分钟最大获取次数
+func WithLimit(limit int) OptionFunc {
+	return func(c *captcha) {
+		c.limit = limit
 	}
 }
 
-func (c *captcha) initFactory(name string, conf *config.Captcha) {
-	c.mu.Lock()
-	c.set[name] = conf
-	c.mu.Unlock()
+// WithLength 设置验证码长度
+func WithLength(length int) OptionFunc {
+	return func(c *captcha) {
+		c.length = length
+	}
 }
 
-func (c *captcha) Image(tp string, ip string) (Response, error) {
-	// 发送邮件
-	sender := Sender{
-		Send: func(conf *config.Captcha, answer string, expire time.Duration) (string, error) {
-			// 生成验证码对应图片的base64
-			dt := base64Captcha.NewDriverDigit(conf.Height, conf.Width, conf.Length, conf.Skew, conf.DotCount)
-			item, err := dt.DrawCaptcha(answer)
-			if err != nil {
-				return "", err
-			}
-			return item.EncodeB64string(), err
-		},
-		UUID: "",
+// WithExpire 设置验证码过期时间
+func WithExpire(expire time.Duration) OptionFunc {
+	return func(c *captcha) {
+		c.expire = expire
 	}
-
-	return c.generate(tp, ip, imageType, sender)
 }
 
-func (c *captcha) Email(tp string, ip string, to string) (Response, error) {
-	// 发送邮件
-	sender := Sender{
-		Send: func(conf *config.Captcha, answer string, expire time.Duration) (string, error) {
-			err := email.Instance().Template(conf.Template).Send(to, "", map[string]any{
-				"captcha": answer,
-				"minute":  int(conf.Expire.Minutes()),
-			})
-			return "", err
-		},
-		UUID: to,
+// WithUniqueDevice 设置是否唯一设备
+func WithUniqueDevice(unique bool) OptionFunc {
+	return func(c *captcha) {
+		c.uniqueDevice = unique
 	}
-
-	return c.generate(tp, ip, emailType, sender)
 }
 
-func (c *captcha) generate(tp, ip, tpe string, sender Sender) (Response, error) {
-	conf, is := c.set[tp]
-	if !is {
-		return nil, fmt.Errorf("%s captcha not exist", tp)
+// WithRefresh 设置刷新验证码需要等待的时间
+func WithRefresh(wait time.Duration) OptionFunc {
+	return func(c *captcha) {
+		c.refreshTime = wait
+	}
+}
+
+// WithVerifiedDelete 验证成功后是否删除验证码
+func WithVerifiedDelete(is bool) OptionFunc {
+	return func(c *captcha) {
+		c.verifiedDelete = is
+	}
+}
+
+// WithContext 验证成功后是否删除验证码
+func WithContext(ctx context.Context) OptionFunc {
+	return func(c *captcha) {
+		c.ctx = ctx
+	}
+}
+
+// NewCaptcha 初始化captcha对象
+func NewCaptcha(redis *redis.Client, opts ...OptionFunc) Captcha {
+	option := &captcha{
+		redis:          redis,
+		ctx:            context.Background(),
+		limit:          captchaDefaultLimit,
+		length:         captchaDefaultLength,
+		expire:         captchaDefaultExpireTime,
+		refreshTime:    captchaDefaultRefreshTime,
+		uniqueDevice:   captchaDefaultUniqueDevice,
+		verifiedDelete: captchaDefaultVerifiedDelete,
+	}
+	for _, opt := range opts {
+		opt(option)
+	}
+	return option
+}
+
+// GetCaptchaDuration 获取验证码过期时间
+func (c *captcha) GetCaptchaDuration() time.Duration {
+	return c.expire
+}
+
+// VerifyCaptcha 验证验证码
+func (c *captcha) VerifyCaptcha(req *VerifyCaptchaRequest) error {
+	// 获取当前场景下客户端的唯一id
+	sid := c.sid(req.Scene, req.ClientIP)
+
+	// 通过uuid生成uid
+	uid := c.getUIDByUUID(req.UUID)
+
+	// 唯一设备校验
+	if c.uniqueDevice && uid != c.uid(sid, req.User) {
+		return errorInvalidCaptcha
 	}
 
-	// 获取验证码存储器
-	cache := redis.Instance().Get(conf.Redis)
-	if cache == nil {
-		return nil, fmt.Errorf("redis %v not exist", conf.Redis)
+	// 获取验证码的唯一aid
+	aid := c.aid(req.Scene, req.User, req.VerifyCode)
+
+	// 判断验证码是否正确,或过期
+	oriAid, _ := c.redis.Get(c.ctx, uid).Result()
+	if oriAid != aid {
+		return errorInvalidCaptcha
 	}
 
+	// 清除验证码
+	if c.verifiedDelete {
+		return c.redis.Del(c.ctx, uid).Err()
+	}
+	return nil
+}
+
+// GetCaptcha 获取验证码
+func (c *captcha) GetCaptcha(req *GetCaptchaRequest) (*GetCaptchaResponse, error) {
 	// 生成随机验证码
-	answer := c.randomCode(conf.Length)
+	verifyCode := c.randomCode(c.length)
 
-	// 获取当前用户的场景唯一id
-	clientKey := c.clientUid(tp, ip, tpe)
+	// 获取当前场景下客户端的唯一id
+	sid := c.sid(req.Scene, req.ClientIP)
 
-	countKey := fmt.Sprintf("%s_count", clientKey)
-
-	// 判断ip是否限制次数
-	if conf.IpLimit != 0 {
-		if count, _ := cache.Get(context.Background(), countKey).Int(); count > conf.IpLimit {
-			return nil, errors.New("当前IP已超过最大验证次数")
+	// 判断是否超过最大的获取次数
+	if c.limit != 0 {
+		var count int
+		_ = c.redis.Get(c.ctx, sid).Scan(&count)
+		if count > c.limit {
+			return nil, errorLimit
 		}
 	}
 
-	// 清除上一次生成的结果,防止同时造成大量生成请求占用内存
-	if uid, _ := cache.Get(context.Background(), clientKey).Result(); uid != "" {
-		if !conf.Refresh {
-			return nil, errors.New("请勿重复请求验证码")
+	// 获取当前场景下客户端用户的唯一id
+	uid := c.uid(sid, req.User)
+
+	// 判断是否允许刷新验证码
+	if ttl := c.redis.TTL(c.ctx, uid).Val(); ttl.Seconds() > 0 {
+		if c.refreshTime > 0 && (c.expire.Seconds()-ttl.Seconds()) < c.refreshTime.Seconds() {
+			return nil, errorDup
 		}
-		cache.Del(context.Background(), uid)
+		// 清除旧的验证码
+		c.redis.Del(c.ctx, uid)
 	}
 
-	// 执行发送器
-	base64, err := sender.Send(conf, answer, conf.Expire)
-	if err != nil {
+	// 生成验证码的唯一id
+	aid := c.aid(req.Scene, req.User, verifyCode)
+
+	// 设置验证码
+	if err := c.redis.Set(c.ctx, uid, aid, c.expire).Err(); err != nil {
 		return nil, err
 	}
 
-	// 获取当前验证码验证码唯一id
-	uid := c.uid(clientKey, answer, sender.UUID)
-
-	// 将本次验证码挂载到当前的场景id上
-	if err := cache.Set(context.Background(), clientKey, uid, conf.Expire).Err(); err != nil {
-		return nil, err
+	// 当天请求次数累计
+	now := time.Now()
+	endTime := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), now.Location())
+	if !c.redis.SetNX(c.ctx, sid, 1, endTime.Sub(now)).Val() {
+		_ = c.redis.Incr(c.ctx, sid)
 	}
 
-	// 存储发送次数
-	if conf.IpLimit != 0 && cache.Incr(context.Background(), countKey).Val() == 1 {
-		// 设置当天00:00过期
-		timeStr := time.Now().Format("2006-01-02")
-		t, _ := time.ParseInLocation("2006-01-02", timeStr, time.Local)
-		cache.ExpireAt(context.Background(), countKey, t.Add(86400*time.Second))
-	}
-
-	// 返回生成结果
-	return &response{
-		id:     uid,
-		expire: conf.Expire,
-		base64: base64,
+	return &GetCaptchaResponse{
+		UUID:       c.getUUIDByUID(uid),
+		VerifyCode: verifyCode,
 	}, nil
 }
 
-func (c *captcha) VerifyEmail(tp, ip, id, answer, email string) error {
-	return c.verify(tp, ip, emailType, id, answer, email)
+// CancelCaptcha 取消验证码
+func (c *captcha) CancelCaptcha(uuid string) error {
+	// 获取当前场景下客户端用户的唯一id
+	uid := c.getUIDByUUID(uuid)
+	return c.redis.Del(c.ctx, uid).Err()
 }
 
-func (c *captcha) VerifyImage(tp, ip, id, answer string) error {
-	return c.verify(tp, ip, imageType, id, answer, "")
+// IsLimitError 判断是否超过最大获取验证码次数
+func (c *captcha) IsLimitError(err error) bool {
+	return errors.Is(err, errorLimit) || errors.Is(err, errorDup)
 }
 
-func (c *captcha) verify(tp, ip, name, id, answer, sender string) error {
-	// 获取指定模板的配置
-	conf, is := c.set[tp]
-	if !is {
-		return fmt.Errorf("%s captcha not exist", tp)
-	}
+// IsDupError 判断是否重复请求验证码
+func (c *captcha) IsDupError(err error) bool {
+	return errors.Is(err, errorDup)
+}
 
-	// 获取验证码存储器
-	cache := redis.Instance().Get(conf.Redis)
-	if cache == nil {
-		return fmt.Errorf("redis %v not exist", conf.Redis)
-	}
+// IsInvalidCaptchaError 判断是否无效的验证码
+func (c *captcha) IsInvalidCaptchaError(err error) bool {
+	return errors.Is(err, errorInvalidCaptcha)
+}
 
-	// 获取当前用户的场景唯一id
-	redisKey := c.clientUid(tp, ip, name)
-	uid := c.uid(redisKey, answer, sender)
-
-	// 获取用户当前的验证码场景id
-	rid, err := cache.Get(context.Background(), redisKey).Result()
-	if err != nil {
-		return err
-	}
-
-	// 对比用户当前的验证码场景是否一致
-	if rid != uid {
-		return fmt.Errorf("captcha id %s  not exist", id)
-	}
-
-	// 验证通过清除缓存
-	return cache.Del(context.Background(), redisKey).Err()
+// ClearDeviceLimit 清除设备限制
+func (c *captcha) ClearDeviceLimit(scene, ip string) error {
+	return c.redis.Del(c.ctx, c.sid(scene, ip)).Err()
 }
 
 // randomCode 生成随机数验证码
 func (c *captcha) randomCode(len int) string {
-	rng := rand.New(rand.NewSource(time.Now().Unix()))
-	var code = rng.Intn(int(math.Pow10(len)) - int(math.Pow10(len-1)))
+	code := rand.Intn(int(math.Pow10(len)) - int(math.Pow10(len-1)))
 	return strconv.Itoa(code + int(math.Pow10(len-1)))
 }
 
-// uid 获取唯一id
-func (c *captcha) clientUid(tp, ip, name string) string {
-	return fmt.Sprintf("captcha:%s:%s:%x", name, tp, md5.Sum([]byte(ip)))
+// sid 生成当前场景下客户端的唯一id
+func (c *captcha) sid(scene, ip string) string {
+	return fmt.Sprintf("captcha:s:%x", md5.Sum([]byte(fmt.Sprintf("%s:%s", scene, ip))))
 }
 
-// uid 获取唯一id
-func (c *captcha) uid(cid, ans, sender string) string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s:%s:%s", cid, ans, sender))))
+// sid 生成当前场景下客户端手机号的唯一id
+func (c *captcha) uid(sid, user string) string {
+	return fmt.Sprintf("captcha:u:%x", md5.Sum([]byte(fmt.Sprintf("%s:%s", sid, user))))
+}
+
+// sid 生成当前场景下客户端手机号的唯一id
+func (c *captcha) getUUIDByUID(uid string) string {
+	return strings.TrimPrefix(uid, "captcha:u:")
+}
+
+// getUidByUuid 生成验证码的唯一uid
+func (c *captcha) getUIDByUUID(uuid string) string {
+	return fmt.Sprintf("captcha:u:%s", uuid)
+}
+
+// uuid 生成验证码的唯一uid
+func (c *captcha) aid(scene, user, answer string) string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s:%s:%s", scene, user, answer))))
 }

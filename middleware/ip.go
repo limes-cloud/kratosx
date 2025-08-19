@@ -2,18 +2,20 @@ package middleware
 
 import (
 	"context"
+	"strings"
+
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport/http"
-	ip2 "github.com/limes-cloud/kratosx/library/ip"
 	"google.golang.org/grpc/peer"
-	"strings"
+
+	ip2 "github.com/limes-cloud/kratosx/library/ip"
 )
 
 func IP() middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (any, error) {
 			ip := ""
-			if p, is := peer.FromContext(ctx); is { //grpc
+			if p, is := peer.FromContext(ctx); is { // grpc
 				if strings.Contains(p.Addr.String(), "::1") {
 					ip = "localhost"
 				} else {
@@ -30,7 +32,7 @@ func IP() middleware.Middleware {
 					ip = h.Header.Get("x-real-ip")
 				}
 			}
-			ctx = context.WithValue(ctx, ip2.IPKey{}, ip)
+			ctx = context.WithValue(ctx, ip2.Key{}, ip)
 			return handler(ctx, req)
 		}
 	}

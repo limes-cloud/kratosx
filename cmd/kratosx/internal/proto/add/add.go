@@ -2,13 +2,15 @@ package add
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/mod/modfile"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
 // CmdAdd represents the add command.
@@ -32,7 +34,16 @@ func run(_ *cobra.Command, args []string) {
 	}
 	path := input[:n]
 	fileName := input[n+1:]
+	// api/bxxx/xxx
 	pkgName := strings.ReplaceAll(path, "/", ".")
+	modName := base.ModName(path)
+	modArr := strings.Split(modName, "/")
+	for _, v := range modArr {
+		if strings.HasPrefix(pkgName, v) {
+			pkgName = strings.ReplaceAll(pkgName, v+".", "")
+		}
+	}
+	pkgName = strings.Join(modArr, ".") + "." + pkgName
 
 	p := &Proto{
 		Name:        fileName,
@@ -43,24 +54,26 @@ func run(_ *cobra.Command, args []string) {
 		Service:     serviceName(fileName),
 	}
 	if err := p.Generate(); err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 		return
 	}
 }
 
-func modName() string {
-	modBytes, err := os.ReadFile("go.mod")
-	if err != nil {
-		if modBytes, err = os.ReadFile("../go.mod"); err != nil {
-			return ""
-		}
-	}
-	return modfile.ModulePath(modBytes)
-}
-
+//	func modName() string {
+//		modBytes, err := os.ReadFile("go.mod")
+//		if err != nil {
+//			if modBytes, err = os.ReadFile("../go.mod"); err != nil {
+//				return ""
+//			}
+//		}
+//		return modfile.ModulePath(modBytes)
+//	}
 func goPackage(path string) string {
-	s := strings.Split(path, "/")
-	return modName() + "/" + path + ";" + s[len(s)-1]
+	dir, _ := os.Getwd()
+	s := strings.Split(dir+"/"+path, "/")
+	abs := "."
+	pkg := s[len(s)-1]
+	return abs + ";" + pkg
 }
 
 func javaPackage(name string) string {

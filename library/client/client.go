@@ -64,16 +64,16 @@ func (c *client) connByDiscovery(ctx context.Context) (*ggrpc.ClientConn, error)
 }
 
 func (c *client) options() []grpc.ClientOption {
-	var opts = []grpc.ClientOption{
-		grpc.WithMiddleware(Middlewares(c.applier.endpoint)...),
+	opts := []grpc.ClientOption{
+		grpc.WithMiddleware(middlewares(c.applier.endpoint)...),
 		grpc.WithTimeout(c.applier.endpoint.Timeout),
 	}
 
 	// tls
-	if c.applier.endpoint.Tls != nil {
+	if c.applier.endpoint.TLS != nil {
 		cp := x509.NewCertPool()
-		if cp.AppendCertsFromPEM([]byte(c.applier.endpoint.Tls.Ca)) {
-			tlsConf := &tls.Config{ServerName: c.applier.endpoint.Tls.Name, RootCAs: cp}
+		if cp.AppendCertsFromPEM([]byte(c.applier.endpoint.TLS.Ca)) {
+			tlsConf := &tls.Config{ServerName: c.applier.endpoint.TLS.Name, RootCAs: cp}
 			opts = append(opts, grpc.WithTLSConfig(tlsConf))
 		}
 	}

@@ -12,7 +12,7 @@ import (
 	"github.com/limes-cloud/kratosx/library/signature"
 )
 
-func Middlewares(conf *config.Client) []middleware.Middleware {
+func middlewares(conf *config.Client) []middleware.Middleware {
 	mds := []middleware.Middleware{
 		midmetadata.Client(),
 		logging.Client(logger.Instance()),

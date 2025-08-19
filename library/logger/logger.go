@@ -1,77 +1,191 @@
 package logger
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"sync"
 
-	kratosZap "github.com/go-kratos/kratos/contrib/log/zap/v2"
+	kratoszap "github.com/go-kratos/kratos/contrib/log/zap/v2"
 	"github.com/go-kratos/kratos/v2/log"
+	rotatelogs "github.com/lestrrat/go-file-rotatelogs"
+	"github.com/mbndr/figlet4go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/limes-cloud/kratosx/config"
+	"github.com/limes-cloud/kratosx/pkg"
 )
 
-type LogField map[string]any
+var (
+	// 全局日志器
+	ins *logger
 
-type logger struct {
-	zap *zap.Logger
-	fs  []any
+	// 构造器
+	once sync.Once
+)
+
+type Field map[string]any
+
+// F 构造日志字段
+func F(key string, val any) Field {
+	return Field{key: val}
 }
 
-var ins *logger
+type Logger interface {
+	// Log 原始log方法
+	Log(level log.Level, kvs ...any) error
 
-func Instance(opts ...Option) log.Logger {
+	// Info 日志
+	Info(msg string, fs ...Field)
+
+	// Warn 日志
+	Warn(msg string, fs ...Field)
+
+	// Error 日志
+	Error(msg string, fs ...Field)
+
+	// Art 打印艺术字体
+	Art(msg string)
+
+	// WithContext 载入ctx
+	WithContext(ctx context.Context) Logger
+
+	// Sync 刷新日志
+	Sync() error
+}
+
+type logger struct {
+	zap    *zap.Logger
+	opts   *options
+	logger log.Logger
+}
+
+// Instance 获取全局日志器
+func Instance() Logger {
+	if ins == nil {
+		return &logger{
+			zap:    nil,
+			opts:   &options{},
+			logger: log.With(log.DefaultLogger),
+		}
+	}
+	return ins
+}
+
+// New 复制全局日志器
+func New(opts ...Option) Logger {
 	o := &options{}
 	for _, opt := range opts {
 		opt(o)
 	}
-	zapLog := ins.zap.WithOptions(zap.AddCallerSkip(o.callerSkip))
-	return log.With(kratosZap.NewLogger(zapLog), ins.fs...)
+
+	if ins == nil {
+		return &logger{
+			zap:    nil,
+			opts:   &options{},
+			logger: log.With(log.DefaultLogger),
+		}
+	}
+
+	// 复制日志器
+	return &logger{
+		zap:    ins.zap,
+		opts:   o,
+		logger: log.With(ins.logger, o.GetKV()...),
+	}
 }
 
-func Helper(opts ...Option) *log.Helper {
-	return log.NewHelper(Instance(opts...))
-}
-
-// Init 初始化日志器
-func Init(lc *config.Logger, watcher config.Watcher, fields LogField) {
+// Init 初始化日志
+func Init(conf *config.Logger, opts ...Option) {
 	// 没配置则跳过
-	if lc == nil {
+	if conf == nil {
 		return
 	}
 
-	// log field 转换
-	var fs []any
-	for key, val := range fields {
-		fs = append(fs, key, val)
-	}
-
-	// 初始化
-	ins = &logger{}
-	ins.initFactory(lc, fs)
-
-	watcher("log", func(value config.Value) {
-		if err := value.Scan(lc); err != nil {
-			log.Errorf("配置变更失败：%v", err.Error())
-			return
+	// 初始化日志器
+	once.Do(func() {
+		o := &options{}
+		for _, opt := range opts {
+			opt(o)
 		}
-		// 变更初始化
-		ins.initFactory(lc, fs)
+
+		// 初始化
+		zapLog := newZapLogger(conf)
+		ins = &logger{
+			zap:    zapLog,
+			opts:   o,
+			logger: log.With(kratoszap.NewLogger(zapLog), o.GetKV()...),
+		}
+
+		// 设置全局logger，格式化项目内置的打印器
+		log.SetLogger(ins.logger)
 	})
 }
 
-func (l *logger) initFactory(conf *config.Logger, fs []any) {
-	// 创建zap logger
-	l.zap = l.newZapLogger(conf)
-	l.fs = fs
-
-	gLog := log.With(kratosZap.NewLogger(l.zap), fs...)
-	// 设置全局logger
-	log.SetLogger(gLog)
+func (l *logger) Log(level log.Level, kvs ...any) error {
+	return l.logger.Log(level, kvs...)
 }
 
-func (l *logger) newZapLogger(conf *config.Logger) *zap.Logger {
+// WithContext 载入ctx
+func (l *logger) WithContext(ctx context.Context) Logger {
+	return &logger{
+		zap:    l.zap,
+		opts:   l.opts,
+		logger: log.WithContext(ctx, l.logger),
+	}
+}
+
+// Sync 刷新日志
+func (l *logger) Sync() error {
+	return l.zap.Sync()
+}
+
+// Info 日志
+func (l *logger) Info(msg string, fs ...Field) {
+	_ = l.logger.Log(log.LevelInfo, l.kvs(msg, fs...)...)
+}
+
+// Warn 日志
+func (l *logger) Warn(msg string, fs ...Field) {
+	_ = l.logger.Log(log.LevelWarn, l.kvs(msg, fs...)...)
+}
+
+// Error 日志
+func (l *logger) Error(msg string, fs ...Field) {
+	_ = l.logger.Log(log.LevelError, l.kvs(msg, fs...)...)
+}
+
+// Art 艺术打印输出
+func (l *logger) Art(msg string) {
+	ascii := figlet4go.NewAsciiRender()
+	options := figlet4go.NewRenderOptions()
+	hexColor, _ := figlet4go.NewTrueColorFromHexString("885DBA")
+	options.FontColor = []figlet4go.Color{
+		figlet4go.ColorGreen,
+		figlet4go.ColorYellow,
+		figlet4go.ColorCyan,
+		hexColor,
+	}
+
+	renderStr, _ := ascii.RenderOpts(msg, options)
+	fmt.Println(renderStr)
+}
+
+// kvs 格式化字段
+func (l *logger) kvs(msg string, fs ...Field) []any {
+	fs = append(fs, Field{"msg": msg})
+	var kvs []any
+	for _, f := range fs {
+		for k, v := range f {
+			kvs = append(kvs, k, v)
+		}
+	}
+	return kvs
+}
+
+// newZapLogger 默认使用zap的日志器
+func newZapLogger(conf *config.Logger) *zap.Logger {
 	// 编码器配置
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:        "time",
@@ -86,46 +200,110 @@ func (l *logger) newZapLogger(conf *config.Logger) *zap.Logger {
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	// 输出器配置
-	var output []zapcore.WriteSyncer
-	for _, val := range conf.Output {
-		if val == "stdout" {
-			output = append(output, zapcore.AddSync(os.Stdout))
+	// 获取输出器
+	getOutputs := func(conf *config.Logger, isError bool) []zapcore.WriteSyncer {
+		var output []zapcore.WriteSyncer
+		for _, val := range conf.Output {
+			if val == "file" {
+				fn := conf.File.Name
+				if isError {
+					fn = pkg.AppendFileSuffix(conf.File.Name, "_err")
+				}
+				filer, _ := rotatelogs.New(
+					fn+".%Y%m%d%H",
+					rotatelogs.WithLinkName(fn),
+					rotatelogs.WithRotationTime(conf.File.SplitTime),
+					rotatelogs.WithMaxAge(conf.File.MaxAge),
+					rotatelogs.WithRotationCount(conf.File.MaxBackup),
+				)
+				output = append(output, zapcore.AddSync(filer))
+			}
+
+			if val == "stdout" {
+				output = append(output, zapcore.AddSync(os.Stdout))
+			}
 		}
-		if val == "file" {
-			output = append(output, zapcore.AddSync(&lumberjack.Logger{
-				Filename:   conf.File.Name,
-				MaxSize:    conf.File.MaxSize,
-				MaxBackups: conf.File.MaxBackup,
-				MaxAge:     conf.File.MaxAge,
-				Compress:   conf.File.Compress,
-				LocalTime:  conf.File.LocalTime,
-			}))
-		}
+		return output
 	}
 
+	// // getStdOutputs 获取std输出器
+	// hookStd := func(conf *config.Logger) {
+	//	var output []zapcore.WriteSyncer
+	//	// hookStdout
+	//	fn := pkg.AppendFileSuffix(conf.File.Name, "_stdout")
+	//	stdoutFile, err := os.OpenFile(fn, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	//	if err == nil {
+	//		os.Stdout = stdoutFile
+	//		output = append(output, zapcore.AddSync(stdoutFile))
+	//	}
+	//
+	//	// hookStderr
+	//	fn = pkg.AppendFileSuffix(conf.File.Name, "_stderr")
+	//	stderrFile, err := os.OpenFile(fn, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	//	if err == nil {
+	//		os.Stderr = stderrFile
+	//		output = append(output, zapcore.AddSync(stderrFile))
+	//	}
+	//	return output
+	// }
+
+	// 编码器配置
 	var encoder zapcore.Encoder
 	if conf.EnCoder == "console" {
 		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	} else {
 		encoder = zapcore.NewJSONEncoder(encoderConfig)
 	}
-	core := zapcore.NewCore(
-		encoder,                                // 编码器配置
-		zapcore.NewMultiWriteSyncer(output...), // 输出方式
-		zapcore.Level(conf.Level),              // 设置日志级别
-	)
+
+	var logs []zapcore.Core
+	if conf.File != nil && conf.File.ErrorAlone {
+		logs = []zapcore.Core{
+			zapcore.NewCore(
+				encoder,
+				zapcore.NewMultiWriteSyncer(getOutputs(conf, false)...),
+				zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+					return lvl < zapcore.WarnLevel
+				}),
+			),
+			zapcore.NewCore(
+				encoder,
+				zapcore.NewMultiWriteSyncer(getOutputs(conf, true)...),
+				zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+					return lvl >= zapcore.WarnLevel
+				}),
+			),
+		}
+	} else {
+		logs = []zapcore.Core{
+			zapcore.NewCore(
+				encoder,
+				zapcore.NewMultiWriteSyncer(getOutputs(conf, false)...),
+				zapcore.Level(conf.Level),
+			),
+		}
+	}
+
+	// if conf.HookStd && conf.File != nil {
+	//	logs = append(
+	//		logs,
+	//		zapcore.NewCore(
+	//			encoder,
+	//			zapcore.NewMultiWriteSyncer(getStdOutputs(conf)...),
+	//			zapcore.Level(conf.Level),
+	//		),
+	//	)
+	// }
 
 	// 添加回调
 	var zapOptions []zap.Option
 	if conf.Caller {
 		callerSkip := 3
-		if conf.CallerSkip != nil {
-			callerSkip = *conf.CallerSkip
+		if conf.CallerSkip != 0 {
+			callerSkip = conf.CallerSkip
 		}
 		zapOptions = append(zapOptions, zap.AddCaller())
 		zapOptions = append(zapOptions, zap.AddCallerSkip(callerSkip))
 	}
 
-	return zap.New(core, zapOptions...)
+	return zap.New(zapcore.NewTee(logs...), zapOptions...)
 }

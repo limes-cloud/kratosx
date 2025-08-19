@@ -7,11 +7,10 @@ import (
 	"regexp"
 	"strings"
 
-	"google.golang.org/protobuf/reflect/protoreflect"
-
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
@@ -311,12 +310,12 @@ func camelCase(s string) string {
 
 // Is c an ASCII lower-case letter?
 func isASCIILower(c byte) bool {
-	return 'a' <= c && c <= 'z'
+	return c >= 'a' && c <= 'z'
 }
 
 // Is c an ASCII digit?
 func isASCIIDigit(c byte) bool {
-	return '0' <= c && c <= '9'
+	return c >= '0' && c <= '9'
 }
 
 func protocVersion(gen *protogen.Plugin) string {

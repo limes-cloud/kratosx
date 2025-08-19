@@ -9,9 +9,7 @@ import (
 	"github.com/limes-cloud/kratosx/config"
 )
 
-var (
-	ins *prom
-)
+var ins *prom
 
 type prom struct {
 	counter   map[string]*prometheus.CounterVec

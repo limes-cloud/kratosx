@@ -1,7 +1,7 @@
 package config
 
 import (
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
+	kconfig "github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/mitchellh/mapstructure"
 	"google.golang.org/protobuf/proto"
@@ -20,12 +20,11 @@ type Config interface {
 	ScanWatch(key string, o WatchHandleFunc)
 	Close() error
 	App() *App
-	IsInit() bool
 }
 
 type config struct {
 	app *App
-	ins kratosConfig.Config
+	ins kconfig.Config
 }
 
 var instance *config
@@ -34,17 +33,13 @@ func Instance() Config {
 	return instance
 }
 
-func New(source kratosConfig.Source) Config {
+func New(ls ...kconfig.Source) Config {
 	instance = &config{
-		ins: kratosConfig.New(
-			kratosConfig.WithSource(source),
+		ins: kconfig.New(
+			kconfig.WithSource(ls...),
 		),
 	}
 	return instance
-}
-
-func (c *config) IsInit() bool {
-	return !(c == nil || c.ins == nil)
 }
 
 func (c *config) Load() error {
@@ -86,7 +81,7 @@ func (c *config) Scan(dst any) error {
 	return decoder.Decode(res)
 }
 
-func (c *config) transformValue(val kratosConfig.Value) Value {
+func (c *config) transformValue(val kconfig.Value) Value {
 	return &value{Value: val}
 }
 
@@ -100,7 +95,7 @@ func (c *config) ScanWatch(key string, handler WatchHandleFunc) {
 }
 
 func (c *config) Watch(key string, handler WatchHandleFunc) {
-	if err := c.ins.Watch(key, func(_ string, value kratosConfig.Value) {
+	if err := c.ins.Watch(key, func(_ string, value kconfig.Value) {
 		defer func() {
 			if p := recover(); p != nil {
 				log.Errorf("监听配置失败：%v", p)

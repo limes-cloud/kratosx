@@ -12,7 +12,6 @@ import (
 	"time"
 
 	kerrors "github.com/go-kratos/kratos/v2/errors"
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/metadata"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/selector"
@@ -21,6 +20,7 @@ import (
 	json "github.com/json-iterator/go"
 
 	"github.com/limes-cloud/kratosx/config"
+	"github.com/limes-cloud/kratosx/library/logger"
 )
 
 const (
@@ -51,43 +51,49 @@ type Signature interface {
 
 type signature struct {
 	conf *config.Signature
-	mu   sync.RWMutex
+	mux  sync.RWMutex
 }
 
-var instance *signature
+var (
+	ins *signature
+
+	once sync.Once
+)
 
 func Instance() Signature {
-	return instance
+	return ins
 }
 
+// Init 初始化签名
 func Init(ec *config.Signature, watcher config.Watcher) {
 	if ec == nil {
 		return
 	}
 
-	if ec.Expire == 0 {
-		ec.Expire = defaultTime
-	}
-	instance = &signature{
-		conf: ec,
-	}
-
-	watcher("signature", func(value config.Value) {
-		nec := config.Signature{}
-		if err := value.Scan(&nec); err != nil {
-			log.Errorf("Signature 配置变更失败：%s", err.Error())
-			return
+	once.Do(func() {
+		if ec.Expire == 0 {
+			ec.Expire = defaultTime
 		}
-		if nec.Expire == 0 {
-			nec.Expire = defaultTime
+		ins = &signature{
+			conf: ec,
 		}
 
-		instance.mu.Lock()
-		*instance.conf = nec
-		instance.mu.Unlock()
+		watcher("signature", func(value config.Value) {
+			ins.mux.Lock()
+			defer ins.mux.Unlock()
+
+			if err := value.Scan(&ins.conf); err != nil {
+				logger.Instance().Error("signature 配置变更失败", logger.F("err", err))
+				return
+			}
+			if ins.conf.Expire == 0 {
+				ins.conf.Expire = defaultTime
+			}
+		})
 	})
 }
 
+// Generate 生成签名
 func (s *signature) Generate(content []byte) (int64, string, error) {
 	ts := time.Now().Unix()
 	timestamp := strconv.FormatInt(ts, 10)
@@ -101,6 +107,7 @@ func (s *signature) Generate(content []byte) (int64, string, error) {
 	return ts, hex.EncodeToString(her.Sum(nil)), nil
 }
 
+// Verify 验证签名
 func (s *signature) Verify(content []byte, sign string, ts int64) error {
 	// 解码
 	sig, err := hex.DecodeString(sign)
@@ -126,12 +133,14 @@ func (s *signature) Verify(content []byte, sign string, ts int64) error {
 	return nil
 }
 
+// IsWhitelist 判断是否为白名单
 func (s *signature) IsWhitelist(name string) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mux.RLock()
+	defer s.mux.RUnlock()
 	return s.conf.Whitelist[name]
 }
 
+// Server 服务端签名中间件
 func (s *signature) Server() middleware.Middleware {
 	if s == nil || !s.conf.Enable {
 		return nil
@@ -172,6 +181,7 @@ func (s *signature) Server() middleware.Middleware {
 	}).Build()
 }
 
+// Client 客户端签名中间件
 func (s *signature) Client(conf *config.Signature) middleware.Middleware {
 	if conf == nil || !conf.Enable {
 		return nil

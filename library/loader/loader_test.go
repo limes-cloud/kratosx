@@ -27,5 +27,4 @@ func TestCert_Get(t *testing.T) {
 			t.Errorf("read cert file error :%v", item.input)
 		}
 	}
-
 }

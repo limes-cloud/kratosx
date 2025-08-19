@@ -58,7 +58,6 @@ test_request_test_metrics_count{code="test",kind="test",operation="test",reason=
 
 	histogram.With("test", "test", "test", "test").Observe(0.1)
 	result, err = gatherLatest(reg)
-
 	if err != nil {
 		t.Fatal(err)
 	}

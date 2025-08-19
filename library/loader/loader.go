@@ -5,23 +5,29 @@ import (
 	"os"
 	"sync"
 
-	"github.com/go-kratos/kratos/v2/log"
+	"github.com/limes-cloud/kratosx/library/logger"
+
 	"github.com/limes-cloud/kratosx/config"
 )
 
 type loader struct {
-	mu  sync.RWMutex
-	set map[string][]byte
+	mux  sync.RWMutex
+	conf map[string]string
+	set  map[string][]byte
 }
 
 type Loader interface {
 	Get(name string) []byte
 }
 
-var instance *loader
+var (
+	ins *loader
+
+	once sync.Once
+)
 
 func Instance() Loader {
-	return instance
+	return ins
 }
 
 func Init(conf map[string]string, watcher config.Watcher) {
@@ -30,36 +36,46 @@ func Init(conf map[string]string, watcher config.Watcher) {
 		return
 	}
 
-	instance = &loader{
-		mu:  sync.RWMutex{},
-		set: make(map[string][]byte),
-	}
-
-	// 连接数据库
-	for key, path := range conf {
-		if err := instance.initFactory(key, path); err != nil {
-			panic("加载器初始化失败:" + err.Error())
+	once.Do(func() {
+		ins = &loader{
+			mux:  sync.RWMutex{},
+			set:  make(map[string][]byte),
+			conf: conf,
 		}
 
-		watcher("loader."+key, func(value config.Value) {
-			if err := value.Scan(&conf); err != nil {
-				log.Errorf("Loader配置变更失败：%s", err.Error())
+		// 连接数据库
+		initFunc := func() {
+			for key, path := range ins.conf {
+				if err := ins.initLoader(key, path); err != nil {
+					panic("loader init error:" + err.Error())
+				}
+			}
+		}
+
+		watcher("loader", func(value config.Value) {
+			ins.mux.Lock()
+			defer ins.mux.Unlock()
+
+			if err := value.Scan(&ins.conf); err != nil {
+				logger.Instance().Error("loader config watch error", logger.F("err", err))
 				return
 			}
-			if err := instance.initFactory(key, path); err != nil {
-				log.Errorf("Loader变更重载失败:%s", err.Error())
-			}
+
+			// 执行初始化
+			initFunc()
 		})
-	}
+	})
 }
 
+// Get 获取指定的加载器
 func (c *loader) Get(name string) []byte {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mux.RLock()
+	defer c.mux.RUnlock()
 	return c.set[name]
 }
 
-func (c *loader) initFactory(name string, path string) error {
+// initLoader 初始化加载器
+func (c *loader) initLoader(name string, path string) error {
 	// 获取文件内容
 	file, err := os.Open(path)
 	if err != nil {
@@ -71,16 +87,8 @@ func (c *loader) initFactory(name string, path string) error {
 	}
 	defer file.Close()
 
-	c.mu.Lock()
+	c.mux.Lock()
 	c.set[name] = all
-	c.mu.Unlock()
+	c.mux.Unlock()
 	return nil
-}
-
-// delete 删除指定缓存
-// nolint
-func (c *loader) delete(name string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	delete(c.set, name)
 }

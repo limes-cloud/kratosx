@@ -2,9 +2,10 @@ package middleware
 
 import (
 	"context"
+	"time"
+
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
-	ec "github.com/limes-cloud/kratosx/config"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
@@ -12,7 +13,8 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
-	"time"
+
+	ec "github.com/limes-cloud/kratosx/config"
 )
 
 func Tracer(name string, conf *ec.Tracing) middleware.Middleware {

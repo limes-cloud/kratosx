@@ -18,12 +18,14 @@ func Logging(conf *ec.Logging) middleware.Middleware {
 		return nil
 	}
 
-	return selector.Server(logging.Server(logger.Instance(logger.AddCallerSkip(-1)))).Match(func(ctx context.Context, operation string) bool {
-		path := ""
-		if h, is := http.RequestFromServerContext(ctx); is {
-			path = h.Method + ":" + h.URL.Path
-		}
-		lgIns := lg.Instance()
-		return !(lgIns.IsWhitelist(operation) || lgIns.IsWhitelist(path))
-	}).Build()
+	return selector.Server(
+		logging.Server(logger.New(logger.WithCallerSkip(-1)))).
+		Match(func(ctx context.Context, operation string) bool {
+			path := ""
+			if h, is := http.RequestFromServerContext(ctx); is {
+				path = h.Method + ":" + h.URL.Path
+			}
+			lgIns := lg.Instance()
+			return !(lgIns.IsWhitelist(operation) || lgIns.IsWhitelist(path))
+		}).Build()
 }

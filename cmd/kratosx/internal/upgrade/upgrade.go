@@ -3,8 +3,9 @@ package upgrade
 import (
 	"fmt"
 
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 	"github.com/spf13/cobra"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
 // CmdUpgrade represents the upgrade command.

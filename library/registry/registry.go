@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"net/url"
 
-	kratosRegistry "github.com/go-kratos/kratos/v2/registry"
+	kregistry "github.com/go-kratos/kratos/v2/registry"
 )
 
 type Interface interface {
-	kratosRegistry.Registrar
-	kratosRegistry.Discovery
+	kregistry.Registrar
+	kregistry.Discovery
 }
 
 type Factory func(dsn *url.URL) (Interface, error)
@@ -21,7 +21,7 @@ type Registry interface {
 	Create(registryDSN string) (Interface, error)
 }
 
-var globalRegistry = NewRegistry()
+var ins = NewRegistry()
 
 type registry struct {
 	store map[string]Factory
@@ -62,10 +62,10 @@ func (d *registry) Create(registryDSN string) (Interface, error) {
 
 // Register registers one registry.
 func Register(name string, factory Factory) {
-	globalRegistry.Register(name, factory)
+	ins.Register(name, factory)
 }
 
 // Create instantiates a registry based on `registryDSN`.
 func Create(registryDSN string) (Interface, error) {
-	return globalRegistry.Create(registryDSN)
+	return ins.Create(registryDSN)
 }

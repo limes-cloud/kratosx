@@ -29,6 +29,7 @@ func New(conf config.Config) []middleware.Middleware {
 		// 请求日志
 		Logging(app.Logging),
 		// 参数校验
+		//nolint
 		validate.Validator(),
 		// ip
 		IP(),

@@ -2,76 +2,107 @@ package kratosx
 
 import (
 	"github.com/go-kratos/kratos/v2"
-	kratosConfig "github.com/go-kratos/kratos/v2/config"
+	kconfig "github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/go-kratos/kratos/v2/transport/http"
+	"github.com/limes-cloud/kratosx/library"
+	"github.com/limes-cloud/kratosx/library/env"
 
 	"github.com/limes-cloud/kratosx/config"
-	"github.com/limes-cloud/kratosx/library/logger"
 )
 
 type Option func(o *options)
 
-type RegistrarServerFn func(config config.Config, hs *http.Server, gs *grpc.Server)
+type RegistrarServerFn func(hs *http.Server, gs *grpc.Server)
 
 type options struct {
-	regSrvFn       RegistrarServerFn
-	loggerFields   logger.LogField
-	config         config.Config
-	kOpts          []kratos.Option
+	// 监听配置
+	watch func(config.Watcher)
+	// 配置服务
+	config config.Config
+	// 配置钩子
+	configHooks func(*config.App)
+	// 注册函数
+	regSrvFn RegistrarServerFn
+	// 组件配置
+	libOpts []library.Option
+	// kratos 配置
+	kOpts []kratos.Option
+	// http 服务
 	httpSrvOptions []http.ServerOption
+	// grpc 服务
 	grpcSrvOptions []grpc.ServerOption
-	midOpts        []middleware.Middleware
+	// 中间件
+	midOpts []middleware.Middleware
 }
 
-// RegistrarServer 服务注册
-func RegistrarServer(fn RegistrarServerFn) Option {
+// WithRegistrarServer 服务注册
+func WithRegistrarServer(fn RegistrarServerFn) Option {
 	return func(o *options) {
 		o.regSrvFn = fn
 	}
 }
 
-// LoggerWith 自定义字段
-func LoggerWith(fields logger.LogField) Option {
-	// var fs []any
-	// for key, val := range fields {
-	//	fs = append(fs, key, val)
-	// }
-	return func(o *options) { o.loggerFields = fields }
-}
-
-// Config 配置接入
-func Config(source kratosConfig.Source) Option {
+// WithConfigSource 配置接入
+func WithConfigSource(source ...kconfig.Source) Option {
 	return func(o *options) {
-		o.config = config.New(source)
+		o.config = config.New(source...)
 	}
 }
 
-// Options kratos option
-func Options(opts ...kratos.Option) Option {
+// WithConfigWatch 配置监听
+func WithConfigWatch(watch func(config.Watcher)) Option {
+	return func(o *options) {
+		o.watch = watch
+	}
+}
+
+// WithKratosOptions kratos option
+func WithKratosOptions(opts ...kratos.Option) Option {
 	return func(o *options) {
 		o.kOpts = opts
 	}
 }
 
-// HttpServerOptions http server option
-func HttpServerOptions(opts ...http.ServerOption) Option {
+// WithLibraryOptions 组件服务option
+func WithLibraryOptions(opts ...library.Option) Option {
+	return func(o *options) {
+		o.libOpts = opts
+	}
+}
+
+// WithHttpServerOptions http server option
+func WithHttpServerOptions(opts ...http.ServerOption) Option {
 	return func(o *options) {
 		o.httpSrvOptions = opts
 	}
 }
 
-// GrpcServerOptions grpc server option
-func GrpcServerOptions(opts ...grpc.ServerOption) Option {
+// WithGrpcServerOptions grpc server option
+func WithGrpcServerOptions(opts ...grpc.ServerOption) Option {
 	return func(o *options) {
 		o.grpcSrvOptions = opts
 	}
 }
 
-// MiddlewareOptions middleware option
-func MiddlewareOptions(opts ...middleware.Middleware) Option {
+// WithMiddleware middleware option
+func WithMiddleware(opts ...middleware.Middleware) Option {
 	return func(o *options) {
 		o.midOpts = opts
+	}
+}
+
+// WithUnitTest 单元测试
+func WithUnitTest() Option {
+	return func(o *options) {
+		env.Instance().SetRunUnitTest()
+	}
+}
+
+// WithHookSystemConfig 劫持修改系统配置
+func WithHookSystemConfig(fn func(*config.App)) Option {
+	return func(o *options) {
+		o.configHooks = fn
 	}
 }

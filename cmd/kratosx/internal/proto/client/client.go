@@ -8,8 +8,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/spf13/cobra"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
 // CmdClient represents the source command.
@@ -63,6 +65,9 @@ func run(_ *cobra.Command, args []string) {
 		lastIndex := strings.LastIndex(proto, "/")
 		outPath = proto[:lastIndex]
 	}
+	// 移除尾部的path
+	outPath = strings.TrimSuffix(outPath, "/proto")
+	outPath = strings.TrimSuffix(outPath, "/pb")
 
 	if strings.HasSuffix(proto, ".proto") {
 		err = generate(proto, args)
@@ -70,7 +75,8 @@ func run(_ *cobra.Command, args []string) {
 		err = walk(proto, args)
 	}
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
+		// _, _ = fmt.Fprintf(os.Stderr, err.Error())
 	}
 }
 
@@ -96,7 +102,7 @@ func walk(dir string, args []string) error {
 }
 
 func findProtoFiles(root string) []string {
-	var protoFiles = map[string]struct{}{}
+	protoFiles := map[string]struct{}{}
 
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -129,14 +135,16 @@ func generate(proto string, args []string) error {
 		input = append(input, "--proto_path="+protoPath)
 	}
 
-	// protoDirs := findProtoFiles(".")
-	// for _, path := range protoDirs {
-	//	input = append(input, "--proto_path="+path)
-	// }
+	protoDirs := findProtoFiles(".")
+	for _, path := range protoDirs {
+		input = append(input, "--proto_path="+path)
+	}
 
 	inputExt := []string{
 		"--proto_path=" + base.KratosMod(),
 		"--proto_path=" + filepath.Join(base.KratosMod(), "third_party"),
+		"--proto_path=" + base.KratosxMod(),
+		"--proto_path=" + filepath.Join(base.KratosxMod(), "third_party"),
 		"--go_out=" + outPath,
 		"--go-grpc_out=" + outPath,
 		"--go-httpx_out=" + outPath,
@@ -168,6 +176,45 @@ func generate(proto string, args []string) error {
 	return nil
 }
 
+//	func generate(proto string, args []string) error {
+//		input := []string{
+//			"--proto_path=.",
+//		}
+//		if pathExists(protoPath) {
+//			input = append(input, "--proto_path="+protoPath)
+//		}
+//		inputExt := []string{
+//			"--proto_path=" + base.KratosMod(),
+//			"--proto_path=" + filepath.Join(base.KratosMod(), "third_party"),
+//			"--go_out=paths=source_relative:.",
+//			"--go-grpc_out=paths=source_relative:.",
+//			"--go-http_out=paths=source_relative:.",
+//			"--go-errors_out=paths=source_relative:.",
+//			"--openapi_out=paths=source_relative:.",
+//		}
+//		input = append(input, inputExt...)
+//		protoBytes, err := os.ReadFile(proto)
+//		if err == nil && len(protoBytes) > 0 {
+//			if ok, _ := regexp.Match(`\n[^/]*(import)\s+"validate/validate.proto"`, protoBytes); ok {
+//				input = append(input, "--validate_out=lang=go,paths=source_relative:.")
+//			}
+//		}
+//		input = append(input, proto)
+//		for _, a := range args {
+//			if strings.HasPrefix(a, "-") {
+//				input = append(input, a)
+//			}
+//		}
+//		fd := exec.Command("protoc", input...)
+//		fd.Stdout = os.Stdout
+//		fd.Stderr = os.Stderr
+//		fd.Dir = "."
+//		if err := fd.Run(); err != nil {
+//			return err
+//		}
+//		fmt.Printf("proto: %s\n", proto)
+//		return nil
+//	}
 func pathExists(path string) bool {
 	_, err := os.Stat(path)
 	if err != nil {

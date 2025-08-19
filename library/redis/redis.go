@@ -4,90 +4,78 @@ import (
 	"context"
 	"sync"
 
-	"github.com/go-kratos/kratos/v2/log"
-	goRedis "github.com/go-redis/redis/v8"
+	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/limes-cloud/kratosx/config"
 )
 
 type Redis interface {
 	// Get 获取指定名称的redis实例，如果实例不存在则会nil
-	Get(name ...string) *goRedis.Client
+	Get(name ...string) *goredis.Client
 }
 
 type redis struct {
-	mu  sync.RWMutex
-	set map[string]*goRedis.Client
+	set map[string]*goredis.Client
 	key string
 }
 
-var instance *redis
+var (
+	// redis 实例
+	ins *redis
 
+	once sync.Once
+)
+
+// Instance 获取redis实例
 func Instance() Redis {
-	return instance
+	return ins
 }
 
-func Init(cfs map[string]*config.Redis, watcher config.Watcher) {
+// Init 初始化redis连接池
+func Init(cfs []*config.Redis) {
 	if len(cfs) == 0 {
 		return
 	}
 
-	instance = &redis{
-		mu:  sync.RWMutex{},
-		set: make(map[string]*goRedis.Client),
-	}
-
-	for key, conf := range cfs {
-		if err := instance.initFactory(key, conf); err != nil {
-			panic("init redis error :" + err.Error())
+	once.Do(func() {
+		ins = &redis{
+			set: make(map[string]*goredis.Client),
 		}
 
-		watcher("redis."+key, func(value config.Value) {
-			if err := value.Scan(conf); err != nil {
-				log.Errorf("Redis配置变更失败：%s", err.Error())
-				return
+		for ind, conf := range cfs {
+			if err := ins.initRedis(conf); err != nil {
+				panic("init redis error :" + err.Error())
 			}
-			if err := instance.initFactory(key, conf); err != nil {
-				log.Errorf("Redis变更重载失败：%s", err.Error())
+			if ind == 0 {
+				ins.key = conf.Name
 			}
-		})
-	}
-
-	if len(instance.set) != 1 {
-		instance.key = ""
-	}
+		}
+	})
 }
 
-func (r *redis) initFactory(name string, conf *config.Redis) error {
+// initRedis 初始化redis
+func (r *redis) initRedis(conf *config.Redis) error {
 	if !conf.Enable {
-		r.delete(name)
 		return nil
 	}
-
 	// 连接主数据库
-	client := goRedis.NewClient(&goRedis.Options{
+	client := goredis.NewClient(&goredis.Options{
 		Addr:     conf.Host,
 		Username: conf.Username,
 		Password: conf.Password,
 	})
-	if err := client.Ping(context.TODO()).Err(); err != nil {
+
+	if err := client.Ping(context.Background()).Err(); err != nil {
 		return err
 	}
 
-	r.mu.Lock()
-	r.set[name] = client
-	r.key = name
-	r.mu.Unlock()
+	r.set[conf.Name] = client
 	return nil
 }
 
-func (r *redis) delete(name string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.set, name)
-}
-
-func (r *redis) Get(name ...string) *goRedis.Client {
+// Get 获取指定名称的redis实例，如果实例不存在则会nil
+// 当只存在一个redis配置时，name默认可不传入
+func (r *redis) Get(name ...string) *goredis.Client {
 	if r == nil {
 		return nil
 	}
@@ -95,9 +83,6 @@ func (r *redis) Get(name ...string) *goRedis.Client {
 	if r.key == "" && len(name) == 0 {
 		return nil
 	}
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 
 	key := r.key
 	if len(name) != 0 {

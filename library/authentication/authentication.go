@@ -15,7 +15,7 @@ import (
 	adapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/metadata"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/db"
@@ -42,7 +42,7 @@ type authentication struct {
 	mutex    sync.RWMutex
 }
 
-var instance *authentication
+var ins *authentication
 
 const (
 	redisKey  = "rbac_authentication"
@@ -50,7 +50,7 @@ const (
 )
 
 func Instance() Authentication {
-	return instance
+	return ins
 }
 
 func Init(conf *config.Authentication, watcher config.Watcher) {
@@ -102,15 +102,15 @@ func Init(conf *config.Authentication, watcher config.Watcher) {
 		log.Errorf("casbin watch load policy")
 	})
 
-	instance = &authentication{
+	ins = &authentication{
 		enforcer: object,
 		redis:    rdi,
 		roleKey:  conf.RoleKey,
 		skipRole: make(map[string]struct{}),
 		conf:     conf,
 	}
-	instance.initSkipRole(conf.SkipRole)
-	instance.initWhitelist(conf.Whitelist)
+	ins.initSkipRole(conf.SkipRole)
+	ins.initWhitelist(conf.Whitelist)
 
 	whs := map[string]bool{}
 	watcher("authentication.whitelist", func(value config.Value) {
@@ -118,7 +118,7 @@ func Init(conf *config.Authentication, watcher config.Watcher) {
 			log.Errorf("Authentication Whitelist 配置变更失败：%s", err.Error())
 			return
 		}
-		instance.initWhitelist(whs)
+		ins.initWhitelist(whs)
 	})
 
 	skips := make([]string, 0)
@@ -127,7 +127,8 @@ func Init(conf *config.Authentication, watcher config.Watcher) {
 			log.Errorf("Authentication SkipRole 配置变更失败：%s", err.Error())
 			return
 		}
-		instance.initSkipRole(skips)
+
+		ins.initSkipRole(skips)
 	})
 }
 
@@ -138,9 +139,9 @@ func (a *authentication) initWhitelist(whs map[string]bool) {
 			continue
 		}
 		if is {
-			instance.AddWhitelist(arr[1], arr[0])
+			ins.AddWhitelist(arr[1], arr[0])
 		} else {
-			instance.RemoveWhitelist(arr[1], arr[0])
+			ins.RemoveWhitelist(arr[1], arr[0])
 		}
 	}
 }

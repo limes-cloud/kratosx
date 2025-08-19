@@ -13,42 +13,42 @@ func Test_case2Camel(t *testing.T) {
 	}{
 		{
 			name: "snake1",
-			args: args{"SYSTEM_ERROR"},
+			args: args{name: "SYSTEM_ERROR"},
 			want: "SystemError",
 		},
 		{
 			name: "snake2",
-			args: args{"System_Error"},
+			args: args{name: "System_Error"},
 			want: "SystemError",
 		},
 		{
 			name: "snake3",
-			args: args{"system_error"},
+			args: args{name: "system_error"},
 			want: "SystemError",
 		},
 		{
 			name: "snake4",
-			args: args{"System_error"},
+			args: args{name: "System_error"},
 			want: "SystemError",
 		},
 		{
 			name: "upper1",
-			args: args{"UNKNOWN"},
+			args: args{name: "UNKNOWN"},
 			want: "Unknown",
 		},
 		{
 			name: "camel1",
-			args: args{"SystemError"},
+			args: args{name: "SystemError"},
 			want: "SystemError",
 		},
 		{
 			name: "camel2",
-			args: args{"systemError"},
+			args: args{name: "systemError"},
 			want: "SystemError",
 		},
 		{
 			name: "lower1",
-			args: args{"system"},
+			args: args{name: "system"},
 			want: "System",
 		},
 	}
