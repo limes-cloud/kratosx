@@ -47,7 +47,6 @@ type GrpcService struct {
 	Network        string
 	Host           string
 	Port           int
-	MaxRecvSize    int
 	Timeout        time.Duration
 	TimeoutSpecial map[string]time.Duration
 }
@@ -245,13 +244,15 @@ type Request struct {
 }
 
 type Client struct {
-	Server    string
-	Type      string
-	Timeout   time.Duration
-	Metadata  map[string]string
-	Backends  []Backend
-	Signature *Signature
-	TLS       *TLS
+	Server      string
+	Type        string
+	MaxRecvSize int
+	MaxSendSize int
+	Timeout     time.Duration
+	Metadata    map[string]string
+	Backends    []Backend
+	Signature   *Signature
+	TLS         *TLS
 }
 
 type Backend struct {

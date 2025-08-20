@@ -42,9 +42,22 @@ func (c *client) connByDirect(ctx context.Context) (*ggrpc.ClientConn, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	var callOpts []ggrpc.CallOption
+	endpoint := c.applier.endpoint
+	if endpoint.MaxRecvSize != 0 {
+		callOpts = append(callOpts, ggrpc.MaxCallRecvMsgSize(endpoint.MaxRecvSize*1024*1024))
+	}
+	if endpoint.MaxSendSize != 0 {
+		callOpts = append(callOpts, ggrpc.MaxCallSendMsgSize(endpoint.MaxRecvSize*1024*1024))
+	}
+
 	opts := c.options()
 	opts = append(opts,
 		grpc.WithEndpoint(n.Address()),
+		grpc.WithOptions(
+			ggrpc.WithDefaultCallOptions(callOpts...),
+		),
 	)
 	conn, err := grpc.DialInsecure(ctx, opts...)
 	if err != nil {
