@@ -14,6 +14,9 @@ type Proto struct {
 	Package     string
 	GoPackage   string
 	JavaPackage string
+	RootName    string
+	LService    string
+	LPService   string
 }
 
 // Generate generate a proto template.

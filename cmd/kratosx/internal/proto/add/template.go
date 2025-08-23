@@ -15,12 +15,40 @@ option go_package = "{{.GoPackage}}";
 option java_multiple_files = true;
 option java_package = "{{.JavaPackage}}";
 
+import "google/api/annotations.proto";
+
 service {{.Service}} {
-	rpc Create{{.Service}} (Create{{.Service}}Request) returns (Create{{.Service}}Reply);
-	rpc Update{{.Service}} (Update{{.Service}}Request) returns (Update{{.Service}}Reply);
-	rpc Delete{{.Service}} (Delete{{.Service}}Request) returns (Delete{{.Service}}Reply);
-	rpc Get{{.Service}} (Get{{.Service}}Request) returns (Get{{.Service}}Reply);
-	rpc List{{.Service}} (List{{.Service}}Request) returns (List{{.Service}}Reply);
+	rpc Create{{.Service}} (Create{{.Service}}Request) returns (Create{{.Service}}Reply){
+		option (google.api.http) = {
+			post: "/{{.RootName}}/api/v1/{{.LService}}",
+			body: "*"
+		};
+	}
+
+	rpc Update{{.Service}} (Update{{.Service}}Request) returns (Update{{.Service}}Reply){
+		option (google.api.http) = {
+			put: "/{{.RootName}}/api/v1/{{.LService}}",
+			body: "*"
+		};
+	}
+
+	rpc Delete{{.Service}} (Delete{{.Service}}Request) returns (Delete{{.Service}}Reply){
+		option (google.api.http) = {
+			delete: "/{{.RootName}}/api/v1/{{.LService}}"
+		};
+	}
+
+	rpc Get{{.Service}} (Get{{.Service}}Request) returns (Get{{.Service}}Reply){
+		option (google.api.http) = {
+			get: "/{{.RootName}}/api/v1/{{.LService}}"
+		};
+	}
+
+	rpc List{{.Service}} (List{{.Service}}Request) returns (List{{.Service}}Reply){
+		option (google.api.http) = {
+			get: "/{{.RootName}}/api/v1/{{.LPService}}"
+		};
+	}
 }
 
 message Create{{.Service}}Request {}
