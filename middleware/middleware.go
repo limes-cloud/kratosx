@@ -28,9 +28,6 @@ func New(conf config.Config) []middleware.Middleware {
 		Tracer(app.Name, app.Tracing),
 		// 请求日志
 		Logging(app.Logging),
-		// 参数校验
-		//nolint
-		validate.Validator(),
 		// ip
 		IP(),
 		// jwt
@@ -39,6 +36,9 @@ func New(conf config.Config) []middleware.Middleware {
 		JwtBlack(app.JWT),
 		// jwt 唯一设备
 		JwtUnique(app.JWT),
+		// 参数校验
+		//nolint
+		validate.Validator(),
 	}
 	// 原地删除不启用的中间件
 	return removeDisableMiddleware(mds)

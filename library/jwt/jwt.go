@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"sync"
@@ -10,12 +9,23 @@ import (
 
 	"github.com/limes-cloud/kratosx/library/logger"
 
+	kerros "github.com/go-kratos/kratos/v2/errors"
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	jwtv5 "github.com/golang-jwt/jwt/v5"
 	json "github.com/json-iterator/go"
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/redis"
+)
+
+const reason = "UNAUTHORIZED"
+
+var (
+	ErrInvalidTokenFormat     = kerros.Unauthorized(reason, "Invalid token format")
+	ErrTokenParseFail         = kerros.Unauthorized(reason, "Failed to parse token")
+	ErrJWTConfigNotConfigured = kerros.Unauthorized(reason, "JWT configuration is not enabled or not set")
+	ErrTokenMaxRenewal        = kerros.Unauthorized(reason, "Token has exceeded the maximum renewal time")
+	ErrTokenStillValid        = kerros.Unauthorized(reason, "Token is still valid")
 )
 
 type Jwt interface {
@@ -79,7 +89,7 @@ func Init(conf *config.JWT, watcher config.Watcher) {
 // NewToken is create jwt []byte
 func (j *jwt) NewToken(m map[string]any) (string, error) {
 	if j == nil {
-		return "", errors.New("jwt config not enable or configure")
+		return "", ErrJWTConfigNotConfigured
 	}
 
 	m["exp"] = jwtv5.NewNumericDate(time.Now().Add(j.conf.Expire + time.Second)) // 过期时间
@@ -130,12 +140,12 @@ func (j *jwt) ParseByToken(token string, dst any) error {
 		return []byte(j.conf.Secret), nil
 	})
 	if tokenInfo == nil || tokenInfo.Claims == nil {
-		return errors.New("token parse error")
+		return ErrTokenParseFail
 	}
 
 	claims, is := tokenInfo.Claims.(jwtv5.MapClaims)
 	if !is {
-		return errors.New("token format error")
+		return ErrInvalidTokenFormat
 	}
 
 	body, err := json.Marshal(claims)
@@ -191,30 +201,30 @@ func (j *jwt) SetToken(ctx context.Context, token string) context.Context {
 func (j *jwt) Renewal(ctx context.Context) (string, error) {
 	token := j.GetToken(ctx)
 	if token == "" {
-		return "", errors.New("token is miss")
+		return "", kratosJwt.ErrMissingJwtToken
 	}
 
 	tokenInfo, _ := jwtv5.Parse(token, func(token *jwtv5.Token) (any, error) {
 		return []byte(j.conf.Secret), nil
 	})
 	if tokenInfo == nil || tokenInfo.Claims == nil {
-		return "", errors.New("token parse error")
+		return "", ErrTokenParseFail
 	}
 
 	claims, is := tokenInfo.Claims.(jwtv5.MapClaims)
 	if !is {
-		return "", errors.New("token format error")
+		return "", ErrInvalidTokenFormat
 	}
 
 	// 判断token失效是否超过10s
 	exp := int64(claims["exp"].(float64))
 	now := time.Now().Unix()
 	if exp > now {
-		return "", errors.New("token is alive")
+		return "", ErrTokenStillValid
 	}
 
 	if now-exp > int64(j.conf.Renewal.Seconds()) {
-		return "", errors.New("token is over max renewal time")
+		return "", ErrTokenMaxRenewal
 	}
 
 	return j.NewToken(claims)
