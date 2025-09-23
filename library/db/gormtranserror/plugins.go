@@ -3,6 +3,7 @@ package gormtranserror
 import (
 	"errors"
 	"fmt"
+	"gorm.io/gorm/clause"
 	"reflect"
 	"regexp"
 	"strings"
@@ -257,6 +258,63 @@ func (ep *ErrorPlugin) DuplicatedKey(db *gorm.DB, err *mysql.MySQLError) error {
 	return NewError(db, err, format)
 }
 
+func (ep *ErrorPlugin) getFieldValueFromDest(dest any, fieldName string) (any, bool) {
+	// 获取reflect.Value表示
+	v := reflect.Indirect(reflect.ValueOf(dest))
+
+	// 检查是否是结构体
+	if v.Kind() != reflect.Struct {
+		return nil, false
+	}
+
+	// 使用FieldByName尝试获取字段
+	fieldValue := v.FieldByName(fieldName)
+	if fieldValue.IsValid() {
+		return fieldValue.Interface(), true
+	}
+
+	return nil, false
+}
+
+func (ep *ErrorPlugin) parseValuesClause(db *gorm.DB, name string) ([]string, bool) {
+	c, ok := db.Statement.Clauses["VALUES"]
+	if !ok {
+		return nil, false
+	}
+	value, ok := c.Expression.(clause.Values)
+	if !ok {
+		return nil, false
+	}
+	var (
+		index  = -1
+		res    []string
+		bucket = map[string]bool{}
+	)
+
+	for ind, col := range value.Columns {
+		if col.Name == name {
+			index = ind
+		}
+	}
+
+	if index == -1 {
+		return nil, false
+	}
+	for _, v := range value.Values {
+		if len(v) <= index {
+			continue
+		}
+		val := fmt.Sprint(v[index])
+
+		if bucket[val] {
+			continue
+		}
+		res = append(res, val)
+		bucket[val] = true
+	}
+	return res, true
+}
+
 // ForeignKey 处理创建引用错误
 func (ep *ErrorPlugin) ForeignKey(db *gorm.DB, err *mysql.MySQLError, isCreate bool) error {
 	info, er := ep.findForeignInfo(err.Message)
@@ -273,26 +331,58 @@ func (ep *ErrorPlugin) ForeignKey(db *gorm.DB, err *mysql.MySQLError, isCreate b
 		format = ep.opts.addForeignKeyFormat
 		table = info.References.Table
 		column = info.References.Column
+
+		col := db.Statement.Schema.FieldsByDBName[info.Foreign.Column]
+		if col != nil && len(col.StructField.Index) > 0 {
+			// 获取对应字段的index
+			//index := col.StructField.Index[0]
+			//cla, ok := db.Statement.Clauses["VALUES"]
+			//if ok {
+			//	value,ok := clause.Expression.(clause.Values)
+			//	if
+			//}
+			//if db.Statement.Schema.FieldsByDBName["id"] != nil {
+			//	index = index - 1
+			//}
+			v, ok := ep.parseValuesClause(db, info.Foreign.Column)
+			if ok {
+				if len(v) == 1 {
+					value = fmt.Sprint(v[0])
+				} else {
+					value = strings.Join(v, ",")
+				}
+			}
+		}
 	} else {
 		format = ep.opts.delForeignKeyFormat
 		table = info.Foreign.Table
 		column = info.Foreign.Column
 	}
 
-	if len(db.Statement.Vars) == 1 {
-		value = fmt.Sprint(db.Statement.Vars[0])
-	} else if db.Statement.ReflectValue.Kind() == reflect.Struct {
-		rv := db.Statement.ReflectValue
-		for _, col := range db.Statement.Schema.Fields {
-			if col.DBName == column {
-				v := rv.FieldByName(col.Name)
-				value = fmt.Sprint(v.Interface())
+	if value == "" {
+		if len(db.Statement.Vars) == 1 {
+			value = fmt.Sprint(db.Statement.Vars[0])
+		} else if db.Statement.ReflectValue.Kind() == reflect.Struct {
+			rv := db.Statement.ReflectValue
+			for _, col := range db.Statement.Schema.Fields {
+				if col.DBName == column {
+					v := rv.FieldByName(col.Name)
+					value = fmt.Sprint(v.Interface())
+				}
 			}
+		} else {
+			vs := db.Statement.Vars
+			if len(db.Statement.Vars) > 3 {
+				vs = db.Statement.Vars[0:3]
+			}
+			value = fmt.Sprint(vs) + "..."
 		}
-	} else {
-		vs := db.Statement.Vars[0:3]
-		value = fmt.Sprint(vs) + "..."
 	}
+
+	//for _, field := range db.Statement.Schema.Fields {
+	//	//value := field.ReflectValueOf(context.Background(), db.Statement.ReflectValue)
+	//	fmt.Println(value)
+	//}
 
 	// 替换table
 	format = strings.Replace(format, "{table}", ep.table(db.Statement.Model, table), 1)

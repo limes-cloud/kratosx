@@ -64,6 +64,8 @@ func Init(conf map[string]string, watcher config.Watcher) {
 			// 执行初始化
 			initFunc()
 		})
+
+		initFunc()
 	})
 }
 

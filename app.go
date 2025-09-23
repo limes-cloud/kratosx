@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/limes-cloud/kratosx/library/tasker"
 	"net"
 	"time"
 
@@ -22,7 +23,6 @@ import (
 	"github.com/limes-cloud/kratosx/library/logger"
 	"github.com/limes-cloud/kratosx/library/pprof"
 	"github.com/limes-cloud/kratosx/library/registry"
-	"github.com/limes-cloud/kratosx/library/stopper"
 	"github.com/limes-cloud/kratosx/library/web"
 	"github.com/limes-cloud/kratosx/middleware"
 	"github.com/limes-cloud/kratosx/server/cors"
@@ -57,7 +57,9 @@ func New(opts ...Option) *App {
 	}
 
 	// 配置监听
-	o.watch(o.config.ScanWatch)
+	if o.watch != nil {
+		o.watch(o.config.ScanWatch)
+	}
 
 	library.Init(o.config, o.libOpts...)
 	return &App{
@@ -77,18 +79,26 @@ func (app *App) App() *kratos.App {
 		kratos.Version(app.config.App().Version),
 		kratos.Metadata(map[string]string{}),
 		kratos.BeforeStop(func(ctx context.Context) error {
-			stopper.Instance().WaitBefore()
+			tasker.Instance().WaitBeforeStop()
 			return nil
 		}),
 		kratos.AfterStop(func(ctx context.Context) error {
-			stopper.Instance().WaitAfter()
+			tasker.Instance().WaitAfterStop()
+			return nil
+		}),
+		kratos.BeforeStart(func(ctx context.Context) error {
+			tasker.Instance().WaitBeforeStart()
+			return nil
+		}),
+		kratos.AfterStart(func(ctx context.Context) error {
+			tasker.Instance().WaitAfterStart()
 			return nil
 		}),
 		kratos.Logger(logger.Instance()),
 	}
 
 	// 获取中间件
-	gsOpts, hsOpts := serverOptions(app.config, app.midOpts)
+	gsOpts, hsOpts := serverOptions(app.config, app.midOpts, app.midHooks)
 
 	// 获取grpc/http
 	gsOpts = append(gsOpts, app.grpcSrvOptions...)
@@ -135,7 +145,7 @@ func (app *App) App() *kratos.App {
 	}
 
 	// 注册关闭回调
-	stopper.Instance().RegisterAfter("logger sync", func() {
+	tasker.Instance().AfterStop("logger sync", func() {
 		_ = logger.Instance().Sync()
 	})
 
@@ -144,12 +154,12 @@ func (app *App) App() *kratos.App {
 	)
 }
 
-func serverOptions(conf config.Config, midOpts []kmid.Middleware) ([]grpc.ServerOption, []http.ServerOption) {
+func serverOptions(conf config.Config, midOpts []kmid.Middleware, hook middleware.MidHook) ([]grpc.ServerOption, []http.ServerOption) {
 	var gs []grpc.ServerOption
 	var hs []http.ServerOption
 
 	// 中间件
-	mds := middleware.New(conf)
+	mds := middleware.New(conf, hook)
 	mds = append(mds, midOpts...)
 	gs = append(gs, grpc.Middleware(mds...))
 	hs = append(hs, http.Middleware(mds...))

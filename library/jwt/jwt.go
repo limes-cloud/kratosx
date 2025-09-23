@@ -30,6 +30,7 @@ type Jwt interface {
 	SetToken(ctx context.Context, token string) context.Context
 	Renewal(ctx context.Context) (string, error)
 	CompareUniqueToken(key, token string) bool
+	Config() *config.JWT
 }
 
 type jwt struct {
@@ -74,6 +75,10 @@ func Init(conf *config.JWT, watcher config.Watcher) {
 			}
 		})
 	})
+}
+
+func (j *jwt) Config() *config.JWT {
+	return j.conf
 }
 
 // NewToken is create jwt []byte

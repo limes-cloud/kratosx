@@ -3,6 +3,9 @@ package kratosx
 import (
 	"context"
 	"errors"
+	"github.com/go-kratos/kratos/v2/transport"
+	"github.com/limes-cloud/kratosx/library/tasker"
+	"github.com/limes-cloud/kratosx/pkg/ua"
 	"time"
 
 	"github.com/go-kratos/kratos/v2"
@@ -11,14 +14,12 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/limes-cloud/kratosx/library/env"
 	"github.com/limes-cloud/kratosx/library/request"
-	"github.com/limes-cloud/kratosx/library/stopper"
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"gorm.io/gorm"
 
 	"github.com/limes-cloud/kratosx/config"
-	"github.com/limes-cloud/kratosx/library/authentication"
 	"github.com/limes-cloud/kratosx/library/captcha"
 	"github.com/limes-cloud/kratosx/library/client"
 	"github.com/limes-cloud/kratosx/library/db"
@@ -41,6 +42,9 @@ type Context interface {
 
 	// DB 获取数据库
 	DB(name ...string) *gorm.DB
+
+	// Database 获取系统的数据库
+	Database() db.DB
 
 	// Transaction 获取DB事务
 	Transaction(fn func(ctx Context) error, name ...string) error
@@ -69,9 +73,6 @@ type Context interface {
 	// Token 获取JwtToken
 	Token() string
 
-	// Authentication 获取认证服务
-	Authentication() authentication.Authentication
-
 	// Ctx 获取行下文ctx
 	Ctx() context.Context
 
@@ -87,11 +88,17 @@ type Context interface {
 	// GrpcConn 获取grpc连接
 	GrpcConn(srvName string) (*grpc.ClientConn, error)
 
-	// RegisterBeforeStop 注册关闭前执行函数
-	RegisterBeforeStop(name string, fn func())
+	// BeforeStart 注册关闭前执行函数
+	BeforeStart(name string, fn func())
 
-	// RegisterAfterStop 注册关闭后执行函数
-	RegisterAfterStop(name string, fn func())
+	// AfterStart 注册关闭后执行函数
+	AfterStart(name string, fn func())
+
+	// BeforeStop 注册关闭前执行函数
+	BeforeStop(name string, fn func())
+
+	// AfterStop 注册关闭后执行函数
+	AfterStop(name string, fn func())
 
 	// ID 获取ID
 	ID() string
@@ -132,6 +139,11 @@ type ctx struct {
 	kratos.AppInfo
 }
 
+// Database 获取数据库
+func (c *ctx) Database() db.DB {
+	return db.Instance()
+}
+
 // Ctx 获取行下文ctx
 func (c *ctx) Ctx() context.Context {
 	return c.Context
@@ -163,6 +175,7 @@ func (c *ctx) DB(name ...string) *gorm.DB {
 	if ok {
 		return tx
 	}
+	// 追加数据库名称
 	return dbi.Get(name...).WithContext(c.Ctx())
 }
 
@@ -216,11 +229,6 @@ func (c *ctx) Token() string {
 	return jwt.Instance().GetToken(c.Context)
 }
 
-// Authentication 获取权限验证器
-func (c *ctx) Authentication() authentication.Authentication {
-	return authentication.Instance()
-}
-
 // GetMetadata 获取元数据信息
 func (c *ctx) GetMetadata(key string) string {
 	if values, ok := metadata.FromServerContext(c.Context); ok {
@@ -239,6 +247,15 @@ func (c *ctx) Config() config.Config {
 	return config.Instance()
 }
 
+// UserAgent 用户请求头
+func (c *ctx) UserAgent() ua.UserAgent {
+	header, ok := transport.FromServerContext(c.Context)
+	if !ok {
+		return ua.UserAgent{}
+	}
+	return ua.Parse(header.RequestHeader().Get("User-Agent"))
+}
+
 // GrpcConn 获取grpc 连接具柄
 func (c *ctx) GrpcConn(srvName string) (*grpc.ClientConn, error) {
 	cli := client.Get(srvName)
@@ -253,14 +270,24 @@ func (c *ctx) Clone() Context {
 	return MustContext(context.WithoutCancel(c.Context))
 }
 
-// RegisterBeforeStop 注册服务关闭回调
-func (c *ctx) RegisterBeforeStop(name string, fn func()) {
-	stopper.Instance().RegisterBefore(name, fn)
+// BeforeStop 注册服务关闭回调
+func (c *ctx) BeforeStop(name string, fn func()) {
+	tasker.Instance().BeforeStop(name, fn)
 }
 
-// RegisterAfterStop 注册服务关闭回调
-func (c *ctx) RegisterAfterStop(name string, fn func()) {
-	stopper.Instance().RegisterAfter(name, fn)
+// AfterStop 注册服务关闭回调
+func (c *ctx) AfterStop(name string, fn func()) {
+	tasker.Instance().AfterStop(name, fn)
+}
+
+// BeforeStart 注册服务启动回调
+func (c *ctx) BeforeStart(name string, fn func()) {
+	tasker.Instance().BeforeStart(name, fn)
+}
+
+// AfterStart 注册服务启动回调
+func (c *ctx) AfterStart(name string, fn func()) {
+	tasker.Instance().AfterStart(name, fn)
 }
 
 // Trace 获取trace id
@@ -297,8 +324,9 @@ func (c *ctx) Value(key any) any {
 }
 
 type ContextOption struct {
-	Trace string
-	Span  string
+	Trace      string
+	Span       string
+	SkipDBHook bool
 }
 
 type ContextOptionFunc func(*ContextOption)
@@ -311,6 +339,12 @@ func WithTrace(trace string, span string) ContextOptionFunc {
 	}
 }
 
+func WithSkipDBHook() ContextOptionFunc {
+	return func(o *ContextOption) {
+		o.SkipDBHook = true
+	}
+}
+
 // MustContext returns the Transport value stored in ctx, if any.
 func MustContext(c context.Context, opts ...ContextOptionFunc) Context {
 	o := &ContextOption{}
@@ -320,6 +354,10 @@ func MustContext(c context.Context, opts ...ContextOptionFunc) Context {
 
 	if o.Trace != "" {
 		c = withTraceContext(c, o.Trace, o.Span)
+	}
+
+	if o.SkipDBHook {
+		c = context.WithValue(c, db.SkipHookKey, true)
 	}
 
 	app, _ := kratos.FromContext(c)

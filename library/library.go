@@ -2,7 +2,6 @@ package library
 
 import (
 	"github.com/limes-cloud/kratosx/config"
-	"github.com/limes-cloud/kratosx/library/authentication"
 	"github.com/limes-cloud/kratosx/library/captcha"
 	"github.com/limes-cloud/kratosx/library/client"
 	"github.com/limes-cloud/kratosx/library/db"
@@ -27,7 +26,7 @@ func Init(conf config.Config, opts ...Option) {
 	logger.Init(conf.App().Logger, o.loggerOpts...)
 
 	// 初始化数据库
-	db.Init(conf.App().Database)
+	db.Init(conf.App().Database, o.dbOpts...)
 
 	// 初始化缓存
 	redis.Init(conf.App().Redis)
@@ -49,9 +48,6 @@ func Init(conf config.Config, opts ...Option) {
 
 	// logging 初始化
 	logging.Init(conf.App().Logging, conf.Watch)
-
-	// authentication 鉴权器初始化
-	authentication.Init(conf.App().Authentication, conf.Watch)
 
 	// grpc 客户端初始化
 	client.Init(conf.App().Server.Registry, conf.App().Client, conf.Watch)

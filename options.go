@@ -1,15 +1,16 @@
 package kratosx
 
 import (
+	"context"
 	"github.com/go-kratos/kratos/v2"
 	kconfig "github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/go-kratos/kratos/v2/transport/http"
+	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library"
 	"github.com/limes-cloud/kratosx/library/env"
-
-	"github.com/limes-cloud/kratosx/config"
+	kmid "github.com/limes-cloud/kratosx/middleware"
 )
 
 type Option func(o *options)
@@ -35,6 +36,14 @@ type options struct {
 	grpcSrvOptions []grpc.ServerOption
 	// 中间件
 	midOpts []middleware.Middleware
+	// 中间件hook
+	midHooks kmid.MidHook
+}
+
+func WithValidateErrHook(hook func(ctx context.Context, err error) error) Option {
+	return func(o *options) {
+		o.midHooks.ValidateErrHook = hook
+	}
 }
 
 // WithRegistrarServer 服务注册

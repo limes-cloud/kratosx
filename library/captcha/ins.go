@@ -48,7 +48,7 @@ func Init(cfs map[string]*config.Captcha, watcher config.Watcher) {
 }
 
 func (p pc) Get(ctx context.Context, name string) (Captcha, error) {
-	mux.RUnlock()
+	mux.RLock()
 	defer mux.RUnlock()
 
 	c, ok := p.set[name]

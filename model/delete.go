@@ -28,7 +28,7 @@ func (n NullInt64) Value() (driver.Value, error) {
 	return n.Int64, nil
 }
 
-func (n NullInt64) MarshalJSON() ([]byte, error) {
+func (n *NullInt64) MarshalJSON() ([]byte, error) {
 	if n.Valid {
 		return json.Marshal(n.Int64)
 	}
@@ -47,7 +47,7 @@ func (n *NullInt64) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-func (NullInt64) QueryClauses(f *schema.Field) []clause.Interface {
+func (*NullInt64) QueryClauses(f *schema.Field) []clause.Interface {
 	return []clause.Interface{SoftDeleteQueryClause{Field: f, ZeroValue: parseZeroValueTag(f)}}
 }
 
@@ -95,7 +95,7 @@ func (sd SoftDeleteQueryClause) ModifyStatement(stmt *gorm.Statement) {
 	}
 }
 
-func (NullInt64) UpdateClauses(f *schema.Field) []clause.Interface {
+func (*NullInt64) UpdateClauses(f *schema.Field) []clause.Interface {
 	return []clause.Interface{SoftDeleteUpdateClause{Field: f, ZeroValue: parseZeroValueTag(f)}}
 }
 
@@ -118,7 +118,7 @@ func (sd SoftDeleteUpdateClause) ModifyStatement(stmt *gorm.Statement) {
 	}
 }
 
-func (NullInt64) DeleteClauses(f *schema.Field) []clause.Interface {
+func (*NullInt64) DeleteClauses(f *schema.Field) []clause.Interface {
 	return []clause.Interface{SoftDeleteDeleteClause{Field: f, ZeroValue: parseZeroValueTag(f)}}
 }
 

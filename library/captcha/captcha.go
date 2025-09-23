@@ -15,14 +15,16 @@ import (
 )
 
 type GetCaptchaRequest struct {
-	Scene    string // 验证码场景
-	ClientIP string // 客户端IP地址
-	User     string // 用户标识
+	Scene      string // 验证码场景
+	ClientIP   string // 客户端IP地址
+	User       string // 用户标识
+	VerifyCode string // 设置验证码内容
 }
 
 type GetCaptchaResponse struct {
-	UUID       string // 验证码唯一标识
-	VerifyCode string // 验证码内容
+	UUID       string        // 验证码唯一标识
+	Expire     time.Duration // 验证码有效期
+	VerifyCode string        // 验证码内容
 }
 
 type VerifyCaptchaRequest struct {
@@ -190,8 +192,12 @@ func (c *captcha) VerifyCaptcha(req *VerifyCaptchaRequest) error {
 
 // GetCaptcha 获取验证码
 func (c *captcha) GetCaptcha(req *GetCaptchaRequest) (*GetCaptchaResponse, error) {
+
 	// 生成随机验证码
 	verifyCode := c.randomCode(c.length)
+	if req.VerifyCode != "" {
+		verifyCode = req.VerifyCode
+	}
 
 	// 获取当前场景下客户端的唯一id
 	sid := c.sid(req.Scene, req.ClientIP)
@@ -235,6 +241,7 @@ func (c *captcha) GetCaptcha(req *GetCaptchaRequest) (*GetCaptchaResponse, error
 	return &GetCaptchaResponse{
 		UUID:       c.getUUIDByUID(uid),
 		VerifyCode: verifyCode,
+		Expire:     c.expire,
 	}, nil
 }
 

@@ -1,15 +1,18 @@
 package middleware
 
 import (
+	"context"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/metadata"
-	"github.com/go-kratos/kratos/v2/middleware/validate"
-
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/signature"
 )
 
-func New(conf config.Config) []middleware.Middleware {
+type MidHook struct {
+	ValidateErrHook func(ctx context.Context, err error) error
+}
+
+func New(conf config.Config, hook MidHook) []middleware.Middleware {
 	app := conf.App()
 
 	mds := []middleware.Middleware{
@@ -30,7 +33,7 @@ func New(conf config.Config) []middleware.Middleware {
 		Logging(app.Logging),
 		// 参数校验
 		//nolint
-		validate.Validator(),
+		Validator(hook.ValidateErrHook),
 		// ip
 		IP(),
 		// jwt

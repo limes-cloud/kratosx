@@ -39,11 +39,20 @@ type Logger interface {
 	// Info 日志
 	Info(msg string, fs ...Field)
 
+	// Infow 日志
+	Infow(kvs ...any)
+
 	// Warn 日志
 	Warn(msg string, fs ...Field)
 
+	// Warnw 日志
+	Warnw(kvs ...any)
+
 	// Error 日志
 	Error(msg string, fs ...Field)
+
+	// Errorw 日志
+	Errorw(kvs ...any)
 
 	// Art 打印艺术字体
 	Art(msg string)
@@ -88,11 +97,16 @@ func New(opts ...Option) Logger {
 		}
 	}
 
+	zapLog := ins.zap
+
+	if o.callerSkip != 0 {
+		zapLog = zapLog.WithOptions(zap.AddCallerSkip(o.callerSkip))
+	}
 	// 复制日志器
 	return &logger{
-		zap:    ins.zap,
+		zap:    zapLog,
 		opts:   o,
-		logger: log.With(ins.logger, o.GetKV()...),
+		logger: log.With(kratoszap.NewLogger(zapLog), o.GetKV()...),
 	}
 }
 
@@ -154,6 +168,21 @@ func (l *logger) Warn(msg string, fs ...Field) {
 // Error 日志
 func (l *logger) Error(msg string, fs ...Field) {
 	_ = l.logger.Log(log.LevelError, l.kvs(msg, fs...)...)
+}
+
+// Infow 日志
+func (l *logger) Infow(kvs ...any) {
+	_ = l.logger.Log(log.LevelInfo, kvs...)
+}
+
+// Warnw 日志
+func (l *logger) Warnw(kvs ...any) {
+	_ = l.logger.Log(log.LevelWarn, kvs...)
+}
+
+// Errorw 日志
+func (l *logger) Errorw(kvs ...any) {
+	_ = l.logger.Log(log.LevelError, kvs...)
 }
 
 // Art 艺术打印输出
