@@ -9,11 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/limes-cloud/kratosx/library/tasker"
+
+	"github.com/google/uuid"
 	"github.com/limes-cloud/kratosx/library/logger"
 	lredis "github.com/limes-cloud/kratosx/library/redis"
 	"github.com/redis/go-redis/v9"
-
-	"github.com/google/uuid"
 )
 
 type LockOption func(*lockOption)
@@ -133,7 +134,7 @@ func NewLock(ctx context.Context, key string, opts ...LockOption) Lock {
 		option: opt,
 	}
 	// 在服务关闭时释放锁，防止死锁
-	tasker.Instance().RegisterBefore("release redis lock", func() {
+	tasker.Instance().BeforeStop("release redis lock", func() {
 		_ = task.Release()
 	})
 	return task

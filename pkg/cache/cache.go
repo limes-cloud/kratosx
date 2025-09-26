@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/cast"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/spf13/cast"
 
 	"github.com/google/uuid"
 	"github.com/limes-cloud/kratosx/pkg/crypto"
@@ -220,7 +221,7 @@ func (c *Cache[K, V]) oriCacheVal(val string) V {
 }
 
 func (c *Cache[K, V]) transCacheVal(val V) string {
-	var cv = cacheValue[V]{
+	cv := cacheValue[V]{
 		Val: val,
 	}
 	b, _ := json.Marshal(cv)
@@ -363,14 +364,24 @@ func (c *Cache[K, V]) Init(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	pipe := c.rd.Pipeline()
 	for k, v := range ms {
 		c.val.Store(k, v)
-		pipe.HSet(context.Background(), c.cacheKey(), c.transCacheKey(k), c.transCacheVal(v))
 	}
-	if err := c.setVersion(ctx, pipe, c.version()); err != nil {
-		return err
+
+	// 获取当前的版本
+	rvs, _ := c.rd.Get(ctx, c.versionKey()).Result()
+	vs := c.version()
+	if vs != rvs {
+		pipe := c.rd.Pipeline()
+		pipe.Del(ctx, c.cacheKey())
+		for k, v := range ms {
+			pipe.HSet(context.Background(), c.cacheKey(), c.transCacheKey(k), c.transCacheVal(v))
+		}
+		if err := c.setVersion(ctx, pipe, c.version()); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 

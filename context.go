@@ -3,10 +3,13 @@ package kratosx
 import (
 	"context"
 	"errors"
+	"time"
+
+	"github.com/limes-cloud/kratosx/library/recovery"
+
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/limes-cloud/kratosx/library/tasker"
 	"github.com/limes-cloud/kratosx/pkg/ua"
-	"time"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/metadata"
@@ -117,6 +120,9 @@ type Context interface {
 
 	// Endpoint 获取服务地址
 	Endpoint() []string
+
+	// Exit 代码中断专用
+	Exit(p any)
 
 	// Clone 获取行下文ctx
 	Clone() Context
@@ -300,6 +306,11 @@ func (c *ctx) Trace() string {
 func (c *ctx) Span() string {
 	t, _ := tracing.SpanID()(c.Context).(string)
 	return t
+}
+
+// Exit 中断当前请求
+func (c *ctx) Exit(p any) {
+	recovery.Panic(p)
 }
 
 // Env 获取配置环境

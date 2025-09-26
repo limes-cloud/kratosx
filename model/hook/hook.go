@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"regexp"
+	"strings"
+
 	"github.com/limes-cloud/kratosx/pkg/value"
 	"github.com/spf13/cast"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"reflect"
-	"regexp"
-	"strings"
 )
 
 const (
@@ -69,9 +70,7 @@ type ScopeResponse interface {
 	Fields() []string
 }
 
-var (
-	tagReg = regexp.MustCompile(`\[(.*?)\]`)
-)
+var tagReg = regexp.MustCompile(`\[(.*?)\]`)
 
 func Apply(d *gorm.DB, dbName, method string, req ScopeRequestFunc) {
 	if req == nil {
@@ -89,7 +88,7 @@ func Apply(d *gorm.DB, dbName, method string, req ScopeRequestFunc) {
 		return
 	}
 
-	var hfs = map[string][]column{}
+	hfs := map[string][]column{}
 	if d.Statement.Schema != nil {
 		for _, field := range d.Statement.Schema.Fields {
 			tv, ok := field.TagSettings[TagHook]
@@ -102,24 +101,6 @@ func Apply(d *gorm.DB, dbName, method string, req ScopeRequestFunc) {
 				})
 			}
 		}
-	}
-
-	// 校验当前租户数据
-	if resp.TenantId() == 0 {
-		_ = d.AddError(fmt.Errorf("tenant_id value is zero"))
-		return
-	}
-
-	// 校验当前部门数据
-	if resp.DeptId() == 0 {
-		_ = d.AddError(fmt.Errorf("dept_id value is zero"))
-		return
-	}
-
-	// 校验当前用户数据
-	if resp.UserId() == 0 {
-		_ = d.AddError(fmt.Errorf("user_id value is zero"))
-		return
 	}
 
 	// 没有hook字段，则直接跳过
@@ -223,7 +204,7 @@ func applyJoinQuery(d *gorm.DB, resp ScopeResponse) {
 			if relation == nil {
 				continue
 			}
-			var hfs = map[string]string{}
+			hfs := map[string]string{}
 			for _, field := range relation.FieldSchema.Fields {
 				tv, ok := field.TagSettings[TagHook]
 				if ok {
