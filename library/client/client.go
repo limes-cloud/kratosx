@@ -53,7 +53,8 @@ func (c *client) connByDirect(ctx context.Context) (*ggrpc.ClientConn, error) {
 	}
 
 	opts := c.options()
-	opts = append(opts,
+	opts = append(
+		opts,
 		grpc.WithEndpoint(n.Address()),
 		grpc.WithOptions(
 			ggrpc.WithDefaultCallOptions(callOpts...),

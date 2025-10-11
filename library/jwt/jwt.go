@@ -8,6 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/metadata"
+
+	"github.com/go-kratos/kratos/v2/transport/http"
+
 	"github.com/limes-cloud/kratosx/library/logger"
 
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
@@ -30,6 +34,8 @@ type Jwt interface {
 	SetToken(ctx context.Context, token string) context.Context
 	Renewal(ctx context.Context) (string, error)
 	CompareUniqueToken(key, token string) bool
+	SetInfo(req *http.Request, data string)
+	GetInfo(ctx context.Context, dst any) error
 	Config() *config.JWT
 }
 
@@ -49,6 +55,7 @@ type tokenKey struct{}
 const (
 	blackPrefix  = "token_black"
 	uniquePrefix = "token_unique"
+	infoMdKey    = "x-md-global-info"
 )
 
 // Instance 获取email对象实例
@@ -286,4 +293,24 @@ func (j *jwt) CompareUniqueToken(key, token string) bool {
 	rd := redis.Instance().Get(j.conf.Redis)
 	res, _ := rd.HGet(context.Background(), uniquePrefix, key).Result()
 	return res == token
+}
+
+// GetInfo 从ctx中获取token
+func (j *jwt) GetInfo(ctx context.Context, dst any) error {
+	if md, ok := metadata.FromServerContext(ctx); ok {
+		body := md.Get(infoMdKey)
+		if err := json.Unmarshal([]byte(body), dst); err != nil {
+			return errors.New("auth info format error:" + err.Error())
+		}
+		return nil
+	}
+	return errors.New("not exist auth info")
+}
+
+// SetInfo 设置token的值到当前的ctx
+func (j *jwt) SetInfo(req *http.Request, data string) {
+	if data == "" {
+		return
+	}
+	req.Header.Set(infoMdKey, data)
 }

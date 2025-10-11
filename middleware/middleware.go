@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/metadata"
 	"github.com/limes-cloud/kratosx/config"
@@ -38,6 +39,8 @@ func New(conf config.Config, hook MidHook) []middleware.Middleware {
 		IP(),
 		// jwt
 		Jwt(app.JWT),
+		// jwt token
+		JwtToken(),
 		// jwt黑名单
 		JwtBlack(app.JWT),
 		// jwt 唯一设备

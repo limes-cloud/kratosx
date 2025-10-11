@@ -1,4 +1,4 @@
-package core
+package lock
 
 import (
 	"context"
@@ -52,6 +52,13 @@ func WithLockAcquireWaitTime(timeout time.Duration) LockOption {
 func WithLockAutoRenewal() LockOption {
 	return func(o *lockOption) {
 		o.autoRenewal = true
+	}
+}
+
+// WithRedis 选择指定的redis
+func WithRedis(name string) LockOption {
+	return func(o *lockOption) {
+		o.redis = name
 	}
 }
 
@@ -112,8 +119,8 @@ type lock struct {
 	closed  atomic.Bool
 }
 
-// NewLock 初始化redis-lock
-func NewLock(ctx context.Context, key string, opts ...LockOption) Lock {
+// New 初始化redis-lock
+func New(ctx context.Context, key string, opts ...LockOption) Lock {
 	opt := &lockOption{timeout: 30 * time.Second, value: uuid.NewString()}
 	for _, of := range opts {
 		of(opt)

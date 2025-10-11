@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-kratos/kratos/v2/metadata"
 	"github.com/go-kratos/kratos/v2/middleware"
 	kratosJwt "github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	"github.com/go-kratos/kratos/v2/middleware/selector"
@@ -14,6 +15,10 @@ import (
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/jwt"
+)
+
+const (
+	tokenKey = "x-md-global-token"
 )
 
 // Jwt jwt验证
@@ -49,11 +54,7 @@ func Jwt(conf *config.JWT) middleware.Middleware {
 	}).Build()
 }
 
-// JwtBlack jwt黑名单
-func JwtBlack(conf *config.JWT) middleware.Middleware {
-	if conf == nil {
-		return nil
-	}
+func JwtToken() middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (any, error) {
 			header, ok := transport.FromServerContext(ctx)
@@ -67,7 +68,27 @@ func JwtBlack(conf *config.JWT) middleware.Middleware {
 			}
 
 			token := auths[1]
+			if md, ok := metadata.FromServerContext(ctx); ok {
+				md.Set(tokenKey, token)
+			}
+			return handler(ctx, req)
+		}
+	}
+}
 
+// JwtBlack jwt黑名单
+func JwtBlack(conf *config.JWT) middleware.Middleware {
+	if conf == nil {
+		return nil
+	}
+	return func(handler middleware.Handler) middleware.Handler {
+		return func(ctx context.Context, req any) (any, error) {
+			md, ok := metadata.FromServerContext(ctx)
+			if !ok {
+				return handler(ctx, req)
+			}
+
+			token := md.Get(tokenKey)
 			// 判断token是否在黑名单内
 			jwtIns := jwt.Instance()
 			if jwtIns.IsBlacklist(token) {
