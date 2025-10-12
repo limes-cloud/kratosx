@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	tokenKey = "x-md-global-token"
+	TokenKey = "x-md-global-token"
 )
 
 // Jwt jwt验证
@@ -69,7 +69,7 @@ func JwtToken() middleware.Middleware {
 
 			token := auths[1]
 			if md, ok := metadata.FromServerContext(ctx); ok {
-				md.Set(tokenKey, token)
+				md.Set(TokenKey, token)
 			}
 			return handler(ctx, req)
 		}
@@ -88,7 +88,7 @@ func JwtBlack(conf *config.JWT) middleware.Middleware {
 				return handler(ctx, req)
 			}
 
-			token := md.Get(tokenKey)
+			token := md.Get(TokenKey)
 			// 判断token是否在黑名单内
 			jwtIns := jwt.Instance()
 			if jwtIns.IsBlacklist(token) {

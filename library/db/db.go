@@ -18,13 +18,13 @@ import (
 )
 
 type Entity struct {
-	Database string   `json:"database" gorm:"-"`
-	Name     string   `json:"name"`
-	Comment  string   `json:"comment"`
-	Columns  []Column `json:"columns" gorm:"-"`
+	Database string  `json:"database" gorm:"-"`
+	Name     string  `json:"name"`
+	Comment  string  `json:"comment"`
+	Fields   []Field `json:"fields" gorm:"-"`
 }
 
-type Column struct {
+type Field struct {
 	Name    string `json:"name"`
 	Comment string `json:"comment"`
 }
@@ -286,11 +286,11 @@ func (d *db) loadEntities(db *gorm.DB) []*Entity {
 		entity.Database = database
 
 		cSql := "select column_name as name, column_comment as comment from information_schema.columns where table_schema = ? AND table_name = ?"
-		columns := make([]Column, 0)
+		columns := make([]Field, 0)
 		db.Raw(cSql, database, table).Scan(&columns)
 
 		// 关联表
-		entity.Columns = columns
+		entity.Fields = columns
 
 		list = append(list, &entity)
 	}
