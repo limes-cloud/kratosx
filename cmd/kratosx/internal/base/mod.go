@@ -21,11 +21,12 @@ func ModulePath(filename string) (string, error) {
 }
 
 // ModuleVersion returns module version.
-func ModuleVersion(path string) (string, error) {
+func ModuleVersion(proDir string, path string) (string, error) {
 	stdout := &bytes.Buffer{}
 	fd := exec.Command("go", "mod", "graph")
 	fd.Stdout = stdout
 	fd.Stderr = stdout
+	fd.Dir = proDir
 	if err := fd.Run(); err != nil {
 		return "", err
 	}
@@ -44,7 +45,7 @@ func ModuleVersion(path string) (string, error) {
 }
 
 // KratosMod returns kratos mod.
-func KratosMod() string {
+func KratosMod(proDir string) string {
 	// go 1.15+ read from env GOMODCACHE
 	cacheOut, _ := exec.Command("go", "env", "GOMODCACHE").Output()
 	cachePath := strings.Trim(string(cacheOut), "\n")
@@ -53,7 +54,7 @@ func KratosMod() string {
 	if cachePath == "" {
 		cachePath = filepath.Join(gopath, "pkg", "mod")
 	}
-	if path, err := ModuleVersion("github.com/go-kratos/kratos/v2"); err == nil {
+	if path, err := ModuleVersion(proDir, "github.com/go-kratos/kratos/v2"); err == nil {
 		// $GOPATH/pkg/mod/github.com/limes-cloud/kratos@v2
 		return filepath.Join(cachePath, path)
 	}
@@ -62,7 +63,7 @@ func KratosMod() string {
 }
 
 // KratosxMod returns kratos mod.
-func KratosxMod() string {
+func KratosxMod(proDir string) string {
 	// go 1.15+ read from env GOMODCACHE
 	cacheOut, _ := exec.Command("go", "env", "GOMODCACHE").Output()
 	cachePath := strings.Trim(string(cacheOut), "\n")
@@ -71,7 +72,8 @@ func KratosxMod() string {
 	if cachePath == "" {
 		cachePath = filepath.Join(gopath, "pkg", "mod")
 	}
-	if path, err := ModuleVersion("github.com/limes-cloud/kratosx"); err == nil {
+
+	if path, err := ModuleVersion(proDir, "github.com/limes-cloud/kratosx"); err == nil {
 		// $GOPATH/pkg/mod/github.com/limes-cloud/kratos@v2
 		return filepath.Join(cachePath, path)
 	}
