@@ -127,15 +127,6 @@ func Apply(d *gorm.DB, dbName, method string, req ScopeRequestFunc) {
 	}
 }
 
-func getDatabase(d *gorm.DB) string {
-	//config := d.Statement.Config.Dialector.(*mysql.Config)
-	//switch ins := d.Statement.Config.Dialector.(type) {
-	//case *mysql.Config:
-	//	return ins.DSNConfig.DBName
-	//}
-	return ""
-}
-
 func applyCheckAndSet(d *gorm.DB, method string, hfs map[string][]column, resp ScopeResponse) {
 	for tp, cols := range hfs {
 		var err error
@@ -328,19 +319,44 @@ func checkAndSetValue(value reflect.Value, method, tp string, col column, resp S
 }
 
 func parseTag(tag string) (string, map[string]*op) {
-	getDefaultVal := func(allow bool) map[string]*op {
+	getVal := func(cu ...bool) map[string]*op {
 		defaultOp := func() *op {
 			return &op{
-				check: allow,
-				set:   allow,
-				where: allow,
+				check: false,
+				set:   false,
+				where: false,
 			}
 		}
+		if len(cu) != 0 && cu[0] {
+			return map[string]*op{
+				Create: defaultOp(),
+				Update: defaultOp(),
+				Read:   defaultOp(),
+				Delete: defaultOp(),
+			}
+		}
+
 		return map[string]*op{
-			Create: defaultOp(),
-			Update: defaultOp(),
-			Read:   defaultOp(),
-			Delete: defaultOp(),
+			Create: {
+				check: true,
+				set:   true,
+				where: false,
+			},
+			Update: {
+				check: false,
+				set:   false,
+				where: true,
+			},
+			Read: {
+				check: false,
+				set:   false,
+				where: true,
+			},
+			Delete: {
+				check: false,
+				set:   false,
+				where: true,
+			},
 		}
 	}
 
@@ -377,12 +393,12 @@ func parseTag(tag string) (string, map[string]*op) {
 	// 正则提取[]中的内容
 	pv := tagReg.FindString(tag)
 	if pv == "" || len(pv) == 2 {
-		return tag, getDefaultVal(true)
+		return tag, getVal()
 	}
 
 	key := strings.TrimSuffix(tag, pv)
 	// 计算opVal
-	opVal := getDefaultVal(false)
+	opVal := getVal(true)
 	pv = pv[1 : len(pv)-1]
 	opArr := strings.Split(pv, ",")
 	for _, opItem := range opArr {
