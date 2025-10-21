@@ -66,6 +66,11 @@ var (
 
 // Instance 获取实例
 func Instance(ctx context.Context) Request {
+	if ins == nil {
+		once.Do(func() {
+			ins = &pr{conf: &config.Request{EnableLog: true, RetryCount: 3, Timeout: 30 * time.Second}}
+		})
+	}
 	tins := &pr{conf: ins.conf, ctx: ctx, logger: logger.Instance()}
 	return tins.newRequest()
 }

@@ -76,7 +76,7 @@ func Init(conf *config.JWT, watcher config.Watcher) {
 			ins.rw.Lock()
 			defer ins.rw.Unlock()
 
-			if err := value.Scan(&ins.rw); err != nil {
+			if err := value.Scan(&ins.conf); err != nil {
 				logger.Instance().Info("jwt config watch error", logger.F("err", err))
 				return
 			}

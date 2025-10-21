@@ -13,6 +13,7 @@ import (
 	"github.com/limes-cloud/kratosx/library/pool"
 	"github.com/limes-cloud/kratosx/library/prometheus"
 	"github.com/limes-cloud/kratosx/library/redis"
+	"github.com/limes-cloud/kratosx/library/request"
 	"github.com/limes-cloud/kratosx/library/signature"
 )
 
@@ -57,4 +58,7 @@ func Init(conf config.Config, opts ...Option) {
 
 	// 初始化监控
 	prometheus.Init(conf.App().Prometheus, conf.Watch)
+
+	// request工具初始化
+	request.Init(conf.App().Request, conf.Watch)
 }
