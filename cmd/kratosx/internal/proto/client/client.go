@@ -191,9 +191,29 @@ func findProtoFiles(root string) []string {
 	return list
 }
 
+func resetOutputPath(body string, proto string) {
+	// 识别go的路径
+	// 获取当前proto的路径规则 option go_package = ".;app";
+	var gp string
+	re := regexp.MustCompile(`option go_package\s*=\s*"(.*?)"`)
+	if match := re.FindStringSubmatch(body); match != nil {
+		gp = match[1]
+	}
+	if gp == "" || gp[0] != '.' {
+		return
+	}
+
+	path := projectPath + "/" + proto
+	path = filepath.Dir(path)
+	path = strings.TrimSuffix(path, "/proto")
+	path = strings.TrimSuffix(path, "/pb")
+	outPath = path
+}
+
 // generate is used to execute the generate command for the specified proto file
 func generate(proto string, args []string) error {
-	fmt.Println("projectPath", projectPath, outPath)
+	protoBytes, err := os.ReadFile(projectPath + "/" + proto)
+	resetOutputPath(string(protoBytes), proto)
 	input := []string{
 		"--proto_path=.",
 		"--proto_path=" + projectPath,
@@ -220,7 +240,7 @@ func generate(proto string, args []string) error {
 	}
 
 	input = append(input, inputExt...)
-	protoBytes, err := os.ReadFile(proto)
+
 	if err == nil && len(protoBytes) > 0 {
 		if ok, _ := regexp.Match(`\n[^/]*(import)\s+"validate/validate.proto"`, protoBytes); ok {
 			input = append(input, "--validate_out=lang=go:"+outPath)
@@ -241,7 +261,7 @@ func generate(proto string, args []string) error {
 	if err := fd.Run(); err != nil {
 		return err
 	}
-	fmt.Printf("proto: %s\n", proto)
+	fmt.Printf("proto: %s\n outPath: %s\n", proto, outPath)
 	return nil
 }
 

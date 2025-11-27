@@ -103,6 +103,9 @@ type Context interface {
 	// AfterStop 注册关闭后执行函数
 	AfterStop(name string, fn func())
 
+	// UserAgent 用户请求头信息
+	UserAgent() ua.UserAgent
+
 	// ID 获取ID
 	ID() string
 

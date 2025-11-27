@@ -4,6 +4,7 @@ go 1.24.6
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
+	github.com/emicklei/proto v1.14.2
 	github.com/fatih/color v1.16.0
 	github.com/go-kratos/kratos/v2 v2.8.4
 	github.com/spf13/cobra v1.6.1

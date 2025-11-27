@@ -11,7 +11,7 @@ import (
 )
 
 type PCaptcha interface {
-	Get(ctx context.Context, name string) (Captcha, error)
+	Get(ctx context.Context, name string, opts ...OptionFunc) (Captcha, error)
 }
 
 type pc struct {
@@ -47,7 +47,7 @@ func Init(cfs map[string]*config.Captcha, watcher config.Watcher) {
 	})
 }
 
-func (p pc) Get(ctx context.Context, name string) (Captcha, error) {
+func (p pc) Get(ctx context.Context, name string, opts ...OptionFunc) (Captcha, error) {
 	mux.RLock()
 	defer mux.RUnlock()
 
@@ -62,13 +62,17 @@ func (p pc) Get(ctx context.Context, name string) (Captcha, error) {
 		return nil, errors.New("not fount redis conf by " + c.Redis)
 	}
 
-	return NewCaptcha(
-		rd,
+	defaultOpt := []OptionFunc{
 		WithContext(ctx),
 		WithLimit(c.Limit),
 		WithLength(c.Length),
 		WithExpire(c.Expire),
 		WithUniqueDevice(c.UniqueDevice),
 		WithRefresh(c.RefreshTime),
+	}
+	defaultOpt = append(defaultOpt, opts...)
+	return NewCaptcha(
+		rd,
+		defaultOpt...,
 	), nil
 }

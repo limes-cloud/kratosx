@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gorm.io/gorm/clause"
 	"reflect"
 	"regexp"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/limes-cloud/kratosx/pkg/value"
 	"github.com/spf13/cast"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 const (
@@ -24,6 +24,8 @@ const (
 	TypeTenant = "tenant"
 	TypeDept   = "dept"
 	TypeUser   = "user"
+
+	hookKey = "hooked"
 )
 
 type op struct {
@@ -36,6 +38,7 @@ type column struct {
 	name string
 	db   string
 	op   map[string]*op
+	resp ScopeResponse
 }
 
 type Condition struct {
@@ -73,18 +76,24 @@ type ScopeResponse interface {
 var tagReg = regexp.MustCompile(`\[(.*?)\]`)
 
 func Apply(d *gorm.DB, dbName, method string, req ScopeRequestFunc) {
+	_, is := d.Statement.Context.Value(hookKey).(struct{})
+	if is {
+		return
+	}
+
+	d.Statement.Context = context.WithValue(d.Statement.Context, hookKey, struct{}{})
+
 	if req == nil {
 		return
 	}
 
-	// 获取权限数据
-	resp, err := req(d.Statement.Context, dbName, d.Statement.Table, method)
+	// 获取当前表权限数据
+	curResp, err := req(d.Statement.Context, dbName, d.Statement.Table, method)
 	if err != nil {
 		_ = d.AddError(err)
 		return
 	}
-
-	if resp == nil {
+	if curResp == nil {
 		return
 	}
 
@@ -92,12 +101,26 @@ func Apply(d *gorm.DB, dbName, method string, req ScopeRequestFunc) {
 	if d.Statement.Schema != nil {
 		for _, field := range d.Statement.Schema.Fields {
 			tv, ok := field.TagSettings[TagHook]
-			key, opv := parseTag(tv)
+			key, opv, table := parseTag(tv)
+			if table == "" {
+				table = d.Statement.Table
+			}
 			if ok {
+				// 获取权限数据
+				resp, err := req(d.Statement.Context, dbName, table, method)
+				if err != nil {
+					_ = d.AddError(err)
+					return
+				}
+				if resp == nil {
+					continue
+				}
+
 				hfs[key] = append(hfs[key], column{
 					name: field.Name,
 					db:   field.DBName,
 					op:   opv,
+					resp: resp,
 				})
 			}
 		}
@@ -105,33 +128,32 @@ func Apply(d *gorm.DB, dbName, method string, req ScopeRequestFunc) {
 
 	// 没有hook字段，则直接跳过
 	if len(hfs) == 0 {
-		applyJoinQuery(d, resp)
+		applyJoinQuery(d, dbName, method, req)
 		return
 	}
 
 	switch method {
 	case Create:
-		applyCheckAndSet(d, Create, hfs, resp)
+		applyCheckAndSet(d, Create, hfs)
 	case Update:
-		applyCheckAndSet(d, Update, hfs, resp)
-		applyWhere(d, Update, hfs, resp)
-		applyCondition(d, resp)
+		applyCheckAndSet(d, Update, hfs)
+		applyWhere(d, Update, hfs)
+		applyCondition(d, curResp)
 	case Read:
-		applySelect(d, resp)
-		applyWhere(d, Read, hfs, resp)
-		applyCondition(d, resp)
+		applySelect(d, curResp)
+		applyWhere(d, Read, hfs)
+		applyCondition(d, curResp)
 	case Delete:
-		applyWhere(d, Delete, hfs, resp)
-		applyCondition(d, resp)
-
+		applyWhere(d, Delete, hfs)
+		applyCondition(d, curResp)
 	}
 }
 
-func applyCheckAndSet(d *gorm.DB, method string, hfs map[string][]column, resp ScopeResponse) {
+func applyCheckAndSet(d *gorm.DB, method string, hfs map[string][]column) {
 	for tp, cols := range hfs {
 		var err error
 		for _, col := range cols {
-			err = checkAndSetValue(d.Statement.ReflectValue, method, tp, col, resp)
+			err = checkAndSetValue(d.Statement.ReflectValue, method, tp, col, col.resp)
 			if err != nil {
 				_ = d.AddError(err)
 				return
@@ -141,16 +163,20 @@ func applyCheckAndSet(d *gorm.DB, method string, hfs map[string][]column, resp S
 	}
 }
 
-func applyWhere(d *gorm.DB, method string, hfs map[string][]column, resp ScopeResponse) {
-	all, scope := resp.DeptScopes()
+func applyWhere(d *gorm.DB, method string, hfs map[string][]column) {
+
 	for tp, cols := range hfs {
 		for _, col := range cols {
+			resp := col.resp
+			all, scope := resp.DeptScopes()
 			if !col.op[method].where {
 				continue
 			}
+
 			switch tp {
 			case TypeTenant:
-				d = d.Where(fmt.Sprintf("`%s`.`%s` = ?", d.Statement.Table, col.db), resp.TenantId())
+				sql := fmt.Sprintf("`%s`.`%s` = ?", d.Statement.Table, col.db)
+				d = d.Where(sql, resp.TenantId())
 			case TypeDept:
 				if !all && len(scope) > 0 {
 					d = d.Where(fmt.Sprintf("`%s`.`%s` in ?", d.Statement.Table, col.db), scope)
@@ -164,9 +190,10 @@ func applyWhere(d *gorm.DB, method string, hfs map[string][]column, resp ScopeRe
 	}
 }
 
-func applyJoinQuery(d *gorm.DB, resp ScopeResponse) {
-	all, scope := resp.DeptScopes()
+func applyJoinQuery(d *gorm.DB, database string, method string, req ScopeRequestFunc) {
+
 	applyQueryJoinOn := func(d *gorm.DB, table string, hfs map[string]string, resp ScopeResponse) {
+		all, scope := resp.DeptScopes()
 		for tp, name := range hfs {
 			switch tp {
 			case TypeTenant:
@@ -195,6 +222,14 @@ func applyJoinQuery(d *gorm.DB, resp ScopeResponse) {
 			if relation == nil {
 				continue
 			}
+
+			// 获取权限数据
+			resp, err := req(d.Statement.Context, database, relation.FieldSchema.Table, method)
+			if err != nil {
+				_ = d.AddError(err)
+				return
+			}
+
 			hfs := map[string]string{}
 			for _, field := range relation.FieldSchema.Fields {
 				tv, ok := field.TagSettings[TagHook]
@@ -267,25 +302,46 @@ func checkAndSetValue(value reflect.Value, method, tp string, col column, resp S
 	// 如果是单个对象，则直接设置
 	if value.Kind() == reflect.Struct {
 		fv := value.FieldByName(col.name)
-		if !fv.CanInt() && !fv.CanUint() {
-			return errors.New("field is not uint or int")
-		}
 
-		// 判断是否存在值，存在则校验值是否在预期之内
-		if !fv.IsZero() {
-			// 不检查则跳过
-			if !col.op[method].check {
-				return nil
+		if fv.Kind() == reflect.Ptr {
+			if !fv.IsNil() {
+				// 不检查则跳过
+				if !col.op[method].check {
+					return nil
+				}
+				ori := cast.ToUint32(fv.Elem().Interface())
+				return checkVal(resp, tp, ori)
+			} else {
+				// 不设置则跳过
+				if !col.op[method].set {
+					return nil
+				}
+				ptr := reflect.New(fv.Type().Elem())
+				ptr.Elem().SetUint(uint64(nv))
+				fv.Set(ptr)
 			}
-			ori := cast.ToUint32(fv.Interface())
-			return checkVal(resp, tp, ori)
+
 		} else {
-			// 不设置则跳过
-			if !col.op[method].set {
-				return nil
+			if !fv.CanInt() && !fv.CanUint() {
+				return errors.New("field is not uint or int")
 			}
-			val := transVal(fv.Kind(), nv)
-			fv.Set(reflect.ValueOf(val))
+
+			// 判断是否存在值，存在则校验值是否在预期之内
+			if !fv.IsZero() {
+				// 不检查则跳过
+				if !col.op[method].check {
+					return nil
+				}
+				ori := cast.ToUint32(fv.Interface())
+				return checkVal(resp, tp, ori)
+			} else {
+				// 不设置则跳过
+				if !col.op[method].set {
+					return nil
+				}
+				val := transVal(fv.Kind(), nv)
+				fv.Set(reflect.ValueOf(val))
+			}
 		}
 		return nil
 	}
@@ -293,32 +349,54 @@ func checkAndSetValue(value reflect.Value, method, tp string, col column, resp S
 	// 如果设置为map,则设置对应的key
 	if value.Kind() == reflect.Map {
 		mv := value.MapIndex(reflect.ValueOf(col.name))
-		if !mv.CanInt() && !mv.CanUint() {
-			return errors.New("field is not uint or int")
+
+		if mv.Kind() == reflect.Ptr {
+			if !mv.IsNil() {
+				// 不检查则跳过
+				if !col.op[method].check {
+					return nil
+				}
+				ori := cast.ToUint32(mv.Elem().Interface())
+				return checkVal(resp, tp, ori)
+			} else {
+				// 不设置则跳过
+				if !col.op[method].set {
+					return nil
+				}
+				ptr := reflect.New(mv.Type().Elem())
+				ptr.Elem().SetUint(uint64(nv))
+				mv.Set(ptr)
+			}
+
+		} else {
+			if !mv.CanInt() && !mv.CanUint() {
+				return errors.New("field is not uint or int")
+			}
+
+			// 判断是否存在值，存在则校验值是否在预期之内
+			if !mv.IsZero() {
+				// 不检查则跳过
+				if !col.op[method].check {
+					return nil
+				}
+				ori := cast.ToUint32(mv.Interface())
+				return checkVal(resp, tp, ori)
+			} else {
+				// 不设置则跳过
+				if !col.op[method].set {
+					return nil
+				}
+				val := transVal(mv.Kind(), nv)
+				mv.Set(reflect.ValueOf(val))
+			}
 		}
 
-		// 判断是否存在值，存在则校验值是否在预期之内
-		if !mv.IsZero() {
-			// 不检查则跳过
-			if !col.op[Create].check {
-				return nil
-			}
-			ori := cast.ToUint32(mv.Interface())
-			return checkVal(resp, tp, ori)
-		} else {
-			// 不设置则跳过
-			if !col.op[Create].set {
-				return nil
-			}
-			val := transVal(mv.Kind(), nv)
-			mv.Set(reflect.ValueOf(val))
-		}
 		return nil
 	}
 	return nil
 }
 
-func parseTag(tag string) (string, map[string]*op) {
+func parseTag(tag string) (string, map[string]*op, string) {
 	getVal := func(cu ...bool) map[string]*op {
 		defaultOp := func() *op {
 			return &op{
@@ -392,42 +470,48 @@ func parseTag(tag string) (string, map[string]*op) {
 	// 提取tag tenant[c:csw]
 	// 正则提取[]中的内容
 	pv := tagReg.FindString(tag)
+	key := strings.TrimSuffix(tag, pv)
 	if pv == "" || len(pv) == 2 {
-		return tag, getVal()
+		return key, getVal(), ""
 	}
 
-	key := strings.TrimSuffix(tag, pv)
 	// 计算opVal
 	opVal := getVal(true)
 	pv = pv[1 : len(pv)-1]
-	opArr := strings.Split(pv, ",")
-	for _, opItem := range opArr {
-		opInfo := strings.Split(opItem, ":")
-		if len(opInfo) == 2 {
-			setVal(opInfo[0], opInfo[1], opVal)
-		}
+
+	opInfo := strings.Split(pv, ":")
+	if len(opInfo) == 1 {
+		return key, getVal(), opInfo[0]
+	}
+	if len(opInfo) == 2 {
+		setVal(opInfo[0], opInfo[1], opVal)
+		return key, opVal, ""
+	}
+	if len(opInfo) == 3 {
+		setVal(opInfo[1], opInfo[2], opVal)
+		return key, opVal, opInfo[0]
 	}
 
-	return key, opVal
+	return "", nil, ""
 }
 
 func checkVal(resp ScopeResponse, tp string, ori uint32) error {
 	switch tp {
 	case TypeTenant:
 		if ori != resp.TenantId() {
-			return fmt.Errorf("not tenant scope value is:%d", ori)
+			return fmt.Errorf("not tenant scope value is %d", ori)
 		}
 		return nil
 	case TypeDept:
 		all, scope := resp.DeptScopes()
 		if !all && !value.InList(scope, ori) {
-			return fmt.Errorf("not dept scope value is:%d", ori)
+			return fmt.Errorf("not dept scope value is %d", ori)
 		}
 		return nil
 	case TypeUser:
 		all, scope := resp.DeptScopes()
 		if !all && !value.InList(scope, resp.UserDeptId(ori)) {
-			return fmt.Errorf("not user scope value is:%d", ori)
+			return fmt.Errorf("not user scope value is %d", ori)
 		}
 		return nil
 	default:

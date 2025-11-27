@@ -158,6 +158,9 @@ func NewCaptcha(redis *redis.Client, opts ...OptionFunc) Captcha {
 
 // GetCaptchaDuration 获取验证码过期时间
 func (c *captcha) GetCaptchaDuration() time.Duration {
+	if c.refreshTime != 0 {
+		return c.refreshTime
+	}
 	return c.expire
 }
 
