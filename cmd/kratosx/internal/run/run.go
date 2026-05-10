@@ -71,7 +71,7 @@ func Run(cmd *cobra.Command, args []string) {
 	fd := exec.Command("go", append([]string{"run", dir}, programArgs...)...)
 	fd.Stdout = os.Stdout
 	fd.Stderr = os.Stderr
-	fd.Dir = dir
+	fd.Dir = base
 	changeWorkingDirectory(fd, targetDir)
 	if err := fd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
@@ -132,7 +132,7 @@ func findCMD(base string) (map[string]string, error) {
 		if root {
 			break
 		}
-		_ = filepath.Join(base, "..")
+		base = filepath.Join(base, "..")
 	}
 	return map[string]string{"": base}, nil
 }

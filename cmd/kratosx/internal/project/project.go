@@ -116,10 +116,9 @@ func processProjectParams(projectName string, workingDir string) (projectNameRes
 	if strings.HasPrefix(projectName, "~") {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			// cannot get user home return fallback place dir
 			return _projectDir, _workingDir
 		}
-		_projectDir = filepath.Join(homeDir, projectName[2:])
+		_projectDir = filepath.Join(homeDir, projectName[1:])
 	}
 
 	// check path is relative

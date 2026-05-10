@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
 )
 
 type ReleaseInfo struct {
@@ -50,7 +51,7 @@ func (g *GithubAPI) GetReleaseInfo(version string) ReleaseInfo {
 	releaseInfo := ReleaseInfo{}
 	err := json.Unmarshal(resp, &releaseInfo)
 	if err != nil {
-		fatal(err)
+		base.Fatal(err)
 	}
 	return releaseInfo
 }
@@ -59,10 +60,10 @@ func (g *GithubAPI) GetReleaseInfo(version string) ReleaseInfo {
 func (g *GithubAPI) GetCommitsInfo() []CommitInfo {
 	info := g.GetReleaseInfo("latest")
 	page := 1
-	prePage := 100
+	perPage := 100
 	var list []CommitInfo
 	for {
-		url := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits?pre_page=%d&page=%d&since=%s", g.Owner, g.Repo, prePage, page, info.PublishedAt)
+		url := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits?per_page=%d&page=%d&since=%s", g.Owner, g.Repo, perPage, page, info.PublishedAt)
 		resp, code := requestGithubAPI(url, http.MethodGet, nil, g.Token)
 		if code != http.StatusOK {
 			printGithubErrorInfo(resp)
@@ -70,10 +71,10 @@ func (g *GithubAPI) GetCommitsInfo() []CommitInfo {
 		var res []CommitInfo
 		err := json.Unmarshal(resp, &res)
 		if err != nil {
-			fatal(err)
+			base.Fatal(err)
 		}
 		list = append(list, res...)
-		if len(res) < prePage {
+		if len(res) < perPage {
 			break
 		}
 		page++
@@ -85,28 +86,28 @@ func printGithubErrorInfo(body []byte) {
 	errorInfo := &ErrorInfo{}
 	err := json.Unmarshal(body, errorInfo)
 	if err != nil {
-		fatal(err)
+		base.Fatal(err)
 	}
-	fatal(errors.New(errorInfo.Message))
+	base.Fatal(errors.New(errorInfo.Message))
 }
 
 func requestGithubAPI(url string, method string, body io.Reader, token string) ([]byte, int) {
 	cli := &http.Client{Timeout: 60 * time.Second}
 	request, err := http.NewRequest(method, url, body)
 	if err != nil {
-		fatal(err)
+		base.Fatal(err)
 	}
 	if token != "" {
-		request.Header.Add("Authorization", token)
+		request.Header.Add("Authorization", "Bearer "+token)
 	}
 	resp, err := cli.Do(request)
 	if err != nil {
-		fatal(err)
+		base.Fatal(err)
 	}
 	defer resp.Body.Close()
 	resBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fatal(err)
+		base.Fatal(err)
 	}
 	return resBody, resp.StatusCode
 }
@@ -205,9 +206,4 @@ func ParseGithubURL(url string) (owner string, repo string) {
 	tmp := url[start:end]
 	owner = tmp[strings.Index(tmp, "/")+1:]
 	return
-}
-
-func fatal(err error) {
-	fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err)
-	os.Exit(1)
 }

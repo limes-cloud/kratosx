@@ -106,3 +106,8 @@ func Tree(path string, dir string) {
 		return nil
 	})
 }
+
+func Fatal(err error) {
+	fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err)
+	os.Exit(1)
+}

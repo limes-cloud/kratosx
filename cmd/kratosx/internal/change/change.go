@@ -11,7 +11,7 @@ import (
 var CmdChange = &cobra.Command{
 	Use:   "changelog",
 	Short: "Get a kratosx change log",
-	Long:  "Get a kratosx release or commits info. Example: kratos changelog dev or kratos changelog {version}",
+	Long:  "Get a kratosx release or commits info. Example: kratosx changelog dev or kratosx changelog {version}",
 	Run:   run,
 }
 
@@ -22,7 +22,7 @@ var (
 
 func init() {
 	if repoURL = os.Getenv("KRATOS_REPO"); repoURL == "" {
-		repoURL = "https://github.com/limes-cloud/kratos.git"
+		repoURL = "https://github.com/limes-cloud/kratosx.git"
 	}
 	CmdChange.Flags().StringVarP(&repoURL, "repo-url", "r", repoURL, "github repo")
 	token = os.Getenv("GITHUB_TOKEN")
