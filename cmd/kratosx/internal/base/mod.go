@@ -44,57 +44,42 @@ func ModuleVersion(proDir string, path string) (string, error) {
 	}
 }
 
-// KratosMod returns kratos mod.
-func KratosMod(proDir string) string {
-	// go 1.15+ read from env GOMODCACHE
+func goModCacheAndPath() (cachePath, gopath string) {
 	cacheOut, _ := exec.Command("go", "env", "GOMODCACHE").Output()
-	cachePath := strings.Trim(string(cacheOut), "\n")
+	cachePath = strings.Trim(string(cacheOut), "\n")
 	pathOut, _ := exec.Command("go", "env", "GOPATH").Output()
-	gopath := strings.Trim(string(pathOut), "\n")
+	gopath = strings.Trim(string(pathOut), "\n")
 	if cachePath == "" {
 		cachePath = filepath.Join(gopath, "pkg", "mod")
 	}
+	return
+}
+
+// KratosMod returns kratos mod.
+func KratosMod(proDir string) string {
+	cachePath, gopath := goModCacheAndPath()
 	if path, err := ModuleVersion(proDir, "github.com/go-kratos/kratos/v2"); err == nil {
-		// $GOPATH/pkg/mod/github.com/limes-cloud/kratos@v2
 		return filepath.Join(cachePath, path)
 	}
-	// $GOPATH/src/github.com/limes-cloud/kratos
 	return filepath.Join(gopath, "src", "github.com", "go-kratos", "kratos")
 }
 
-// KratosxMod returns kratos mod.
+// KratosxMod returns kratosx mod.
 func KratosxMod(proDir string) string {
-	// go 1.15+ read from env GOMODCACHE
-	cacheOut, _ := exec.Command("go", "env", "GOMODCACHE").Output()
-	cachePath := strings.Trim(string(cacheOut), "\n")
-	pathOut, _ := exec.Command("go", "env", "GOPATH").Output()
-	gopath := strings.Trim(string(pathOut), "\n")
-	if cachePath == "" {
-		cachePath = filepath.Join(gopath, "pkg", "mod")
-	}
-
+	cachePath, gopath := goModCacheAndPath()
 	if path, err := ModuleVersion(proDir, "github.com/limes-cloud/kratosx"); err == nil {
-		// $GOPATH/pkg/mod/github.com/limes-cloud/kratos@v2
 		return filepath.Join(cachePath, path)
 	}
-	// $GOPATH/src/github.com/limes-cloud/kratos
 	return filepath.Join(gopath, "src", "github.com", "limes-cloud", "kratosx")
 }
 
-// KratosxCliMod returns kratos mod.
+// KratosxCliMod returns kratosx cli mod.
 func KratosxCliMod() string {
 	path := os.Getenv("AUTOCODE_TEMP_PATH")
 	if path != "" {
 		return path
 	}
-	// go 1.15+ read from env GOMODCACHE
-	cacheOut, _ := exec.Command("go", "env", "GOMODCACHE").Output()
-	cachePath := strings.Trim(string(cacheOut), "\n")
-	pathOut, _ := exec.Command("go", "env", "GOPATH").Output()
-	gopath := strings.Trim(string(pathOut), "\n")
-	if cachePath == "" {
-		cachePath = filepath.Join(gopath, "pkg", "mod")
-	}
+	cachePath, gopath := goModCacheAndPath()
 	cliPath := cachePath + "/github.com/limes-cloud/kratosx/cmd"
 
 	files, err := os.ReadDir(cliPath)

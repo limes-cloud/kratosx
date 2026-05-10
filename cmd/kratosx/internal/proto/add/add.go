@@ -76,15 +76,6 @@ func rootName(name string) string {
 	return rn
 }
 
-//	func modName() string {
-//		modBytes, err := os.ReadFile("go.mod")
-//		if err != nil {
-//			if modBytes, err = os.ReadFile("../go.mod"); err != nil {
-//				return ""
-//			}
-//		}
-//		return modfile.ModulePath(modBytes)
-//	}
 func goPackage(path string) string {
 	dir, _ := os.Getwd()
 	s := strings.Split(dir+"/"+path, "/")

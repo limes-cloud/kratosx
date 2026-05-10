@@ -6,7 +6,7 @@ import (
 )
 
 func TestModuleVersion(t *testing.T) {
-	v, err := ModuleVersion("golang.org/x/mod")
+	v, err := ModuleVersion(".", "golang.org/x/mod")
 	if err != nil {
 		t.Fatal(err)
 	}

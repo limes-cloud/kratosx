@@ -2,16 +2,18 @@ package client
 
 import (
 	"fmt"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
-	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/pkg"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/spf13/cobra"
+
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/base"
+	"github.com/limes-cloud/kratosx/cmd/kratosx/internal/pkg"
 )
 
 // CmdClient represents the source command.
@@ -68,36 +70,30 @@ func projectDir(path string) string {
 }
 
 func filterOverlap(path1, path2 string) string {
-	// 移除路径末尾的斜杠
 	path1 = strings.TrimSuffix(path1, "/")
 	path2 = strings.TrimSuffix(path2, "/")
 
-	// 如果path1是path2的前缀，则直接返回path2中不重合的部分
 	if strings.HasPrefix(path2, path1) {
 		return strings.TrimPrefix(path2, path1)
 	}
 
-	// 分割路径为部分
 	parts1 := strings.Split(path1, "/")
 	parts2 := strings.Split(path2, "/")
 
-	// 查找path1与path2重叠的部分
-	overlapIndex := 0
+	overlapIndex := -1
 	for i := len(parts1) - 1; i >= 0; i-- {
-		// 尝试将path1从当前部分开始与path2进行前缀匹配
 		prefix := strings.Join(parts1[i:], "/")
 		if strings.HasPrefix(path2, prefix) {
 			overlapIndex = len(parts1) - i
+			break
 		}
 	}
 
-	// 如果存在重叠，提取path2中不重叠的部分
-	if overlapIndex != -1 {
+	if overlapIndex > 0 {
 		uniqueParts := parts2[overlapIndex:]
 		return strings.Join(uniqueParts, "/")
 	}
 
-	// 如果没有重叠，返回完整的path2
 	return path2
 }
 
@@ -121,14 +117,6 @@ func run(_ *cobra.Command, args []string) {
 			return
 		}
 	}
-
-	//if outPath == "." {
-	//	lastIndex := strings.LastIndex(proto, "/")
-	//	outPath = proto[:lastIndex]
-	//}
-	// 移除尾部的path
-	//outPath = strings.TrimSuffix(outPath, "/proto")
-	//outPath = strings.TrimSuffix(outPath, "/pb")
 
 	projectPath = projectDir(proto)
 	if projectPath != "" {
@@ -184,10 +172,11 @@ func findProtoFiles(root string) []string {
 		return nil
 	})
 
-	var list []string
+	list := make([]string, 0, len(protoFiles))
 	for path := range protoFiles {
 		list = append(list, path)
 	}
+	sort.Strings(list)
 	return list
 }
 
@@ -213,7 +202,9 @@ func resetOutputPath(body string, proto string) {
 // generate is used to execute the generate command for the specified proto file
 func generate(proto string, args []string) error {
 	protoBytes, err := os.ReadFile(projectPath + "/" + proto)
-	resetOutputPath(string(protoBytes), proto)
+	if err == nil {
+		resetOutputPath(string(protoBytes), proto)
+	}
 	input := []string{
 		"--proto_path=.",
 		"--proto_path=" + projectPath,
@@ -264,46 +255,6 @@ func generate(proto string, args []string) error {
 	fmt.Printf("proto: %s\n outPath: %s\n", proto, outPath)
 	return nil
 }
-
-//func generate(proto string, args []string) error {
-//	input := []string{
-//		"--proto_path=.",
-//	}
-//	if pathExists(protoPath) {
-//		input = append(input, "--proto_path="+protoPath)
-//	}
-//	inputExt := []string{
-//		"--proto_path=" + base.KratosMod(),
-//		"--proto_path=" + filepath.Join(base.KratosMod(), "third_party"),
-//		"--go_out=paths=source_relative:.",
-//		"--go-grpc_out=paths=source_relative:.",
-//		"--go-http_out=paths=source_relative:.",
-//		"--go-errors_out=paths=source_relative:.",
-//		"--openapi_out=paths=source_relative:.",
-//	}
-//	input = append(input, inputExt...)
-//	protoBytes, err := os.ReadFile(proto)
-//	if err == nil && len(protoBytes) > 0 {
-//		if ok, _ := regexp.Match(`\n[^/]*(import)\s+"validate/validate.proto"`, protoBytes); ok {
-//			input = append(input, "--validate_out=lang=go,paths=source_relative:.")
-//		}
-//	}
-//	input = append(input, proto)
-//	for _, a := range args {
-//		if strings.HasPrefix(a, "-") {
-//			input = append(input, a)
-//		}
-//	}
-//	fd := exec.Command("protoc", input...)
-//	fd.Stdout = os.Stdout
-//	fd.Stderr = os.Stderr
-//	fd.Dir = "."
-//	if err := fd.Run(); err != nil {
-//		return err
-//	}
-//	fmt.Printf("proto: %s\n", proto)
-//	return nil
-//}
 
 func pathExists(path string) bool {
 	_, err := os.Stat(path)
