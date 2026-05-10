@@ -16,7 +16,7 @@ func Timeout(gs *ec.GrpcService, hs *ec.HttpService) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (any, error) {
 			var timeout time.Duration
-			if tr, ok := transport.FromServerContext(ctx); ok {
+			if tr, ok := transport.FromServerContext(ctx); ok && gs != nil {
 				key := fmt.Sprintf("%s:%s", "GRPC", tr.Operation())
 				t, ok := gs.TimeoutSpecial[key]
 				if ok {
@@ -25,7 +25,7 @@ func Timeout(gs *ec.GrpcService, hs *ec.HttpService) middleware.Middleware {
 					timeout = gs.Timeout
 				}
 			}
-			if h, is := http.RequestFromServerContext(ctx); is {
+			if h, is := http.RequestFromServerContext(ctx); is && hs != nil {
 				key := fmt.Sprintf("%s:%s", h.Method, h.URL.Path)
 				t, ok := hs.TimeoutSpecial[key]
 				if ok {

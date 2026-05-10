@@ -8,55 +8,54 @@ type Tree[T any] interface {
 }
 
 func BuildArrayTree[T Tree[T]](array []T) []T {
-	maxLen := len(array)
-	var rootArray []T
+	index := make(map[uint32]T, len(array))
+	for _, item := range array {
+		index[item.ID()] = item
+	}
+
 	rootSet := FindRootSet(array)
-	for i := 0; i < maxLen; i++ {
-		count := 0
-		for j := 0; j < maxLen; j++ {
-			if array[j].ID() == array[i].Parent() {
-				count++
-				array[j].AppendChildren(array[i])
-			}
+	var rootArray []T
+	for _, item := range array {
+		if parent, ok := index[item.Parent()]; ok {
+			parent.AppendChildren(item)
 		}
-		if rootSet[array[i].ID()] {
-			rootArray = append(rootArray, array[i])
+		if rootSet[item.ID()] {
+			rootArray = append(rootArray, item)
 		}
 	}
 	return rootArray
 }
 
 func BuildTree[T Tree[T]](array []T) T {
-	maxLen := len(array)
+	index := make(map[uint32]T, len(array))
+	for _, item := range array {
+		index[item.ID()] = item
+	}
+
 	var rootNode T
-	for i := 0; i < maxLen; i++ {
-		count := 0
-		for j := 0; j < maxLen; j++ {
-			if array[j].ID() == array[i].Parent() {
-				count++
-				array[j].AppendChildren(array[i])
-			}
-		}
-		if count == 0 && array[i].Parent() == 0 {
-			rootNode = array[i]
+	for _, item := range array {
+		if parent, ok := index[item.Parent()]; ok {
+			parent.AppendChildren(item)
+		} else if item.Parent() == 0 {
+			rootNode = item
 		}
 	}
 	return rootNode
 }
 
 func BuildTreeByID[T Tree[T]](array []T, id uint32) T {
-	maxLen := len(array)
+	index := make(map[uint32]T, len(array))
+	for _, item := range array {
+		index[item.ID()] = item
+	}
+
 	var rootNode T
-	for i := 0; i < maxLen; i++ {
-		count := 0
-		for j := 0; j < maxLen; j++ {
-			if array[j].ID() == array[i].Parent() {
-				count++
-				array[j].AppendChildren(array[i])
-			}
+	for _, item := range array {
+		if parent, ok := index[item.Parent()]; ok {
+			parent.AppendChildren(item)
 		}
-		if array[i].ID() == id {
-			rootNode = array[i]
+		if item.ID() == id {
+			rootNode = item
 		}
 	}
 	return rootNode

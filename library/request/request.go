@@ -15,22 +15,55 @@ import (
 )
 
 type pr struct {
-	conf   *config.Request
+	conf   config.Request
 	ctx    context.Context
 	logger logger.Logger
 }
 
 type request struct {
-	c        *config.Request
-	request  *resty.Request
-	logger   logger.Logger
-	inputLog bool
+	c       *config.Request
+	request *resty.Request
+	logger  logger.Logger
+}
+
+type OptionFunc func(*config.Request)
+
+// WithRetryCount 设置重试次数
+func WithRetryCount(count int) OptionFunc {
+	return func(c *config.Request) {
+		c.RetryCount = count
+	}
+}
+
+// WithTimeout 设置超时时间
+func WithTimeout(timeout time.Duration) OptionFunc {
+	return func(c *config.Request) {
+		c.Timeout = timeout
+	}
+}
+
+// WithEnableLog 是否启用日志
+func WithEnableLog(enable bool) OptionFunc {
+	return func(c *config.Request) {
+		c.EnableLog = enable
+	}
+}
+
+// WithRetryWaitTime 设置重试等待时间
+func WithRetryWaitTime(wait time.Duration) OptionFunc {
+	return func(c *config.Request) {
+		c.RetryWaitTime = wait
+	}
+}
+
+// WithRetryMaxWaitTime 设置重试最大等待时间
+func WithRetryMaxWaitTime(wait time.Duration) OptionFunc {
+	return func(c *config.Request) {
+		c.MaxRetryWaitTime = wait
+	}
 }
 
 type Request interface {
-	// DisableLog 禁用当前请求的日志
-	DisableLog() Request
-
 	// Option 设置请求数据
 	Option(fn Func) Request
 
@@ -65,25 +98,28 @@ var (
 )
 
 // Instance 获取实例
-func Instance(ctx context.Context) Request {
-	if ins == nil {
-		once.Do(func() {
-			ins = &pr{conf: &config.Request{EnableLog: true, RetryCount: 3, Timeout: 30 * time.Second}}
-		})
+func Instance(ctx context.Context, opts ...OptionFunc) Request {
+	// 未初始化时使用默认配置兜底，不写入 ins 以免抢占 Init 的初始化
+	var conf config.Request
+	if ins != nil {
+		conf = ins.conf
+	} else {
+		conf = config.Request{EnableLog: true, RetryCount: 0, Timeout: 60 * time.Second}
 	}
-	tins := &pr{conf: ins.conf, ctx: ctx, logger: logger.Instance()}
-	return tins.newRequest()
+
+	tins := &pr{conf: conf, ctx: ctx, logger: logger.Instance()}
+	return tins.newRequest(opts...)
 }
 
 // Init 初始化
 func Init(conf *config.Request, watcher config.Watcher) {
 	once.Do(func() {
-		ins = &pr{conf: conf}
+		ins = &pr{conf: *conf}
 
 		// 监听配置变更
 		if watcher != nil {
 			watcher("request", func(value config.Value) {
-				if err := value.Scan(ins.conf); err != nil {
+				if err := value.Scan(&ins.conf); err != nil {
 					log.Errorf("配置变更失败：%v", err.Error())
 					return
 				}
@@ -93,16 +129,13 @@ func Init(conf *config.Request, watcher config.Watcher) {
 }
 
 // newRequest 创建请求
-func (h *pr) newRequest() Request {
+func (h *pr) newRequest(opts ...OptionFunc) Request {
 	conf := h.conf
+	for _, opt := range opts {
+		opt(&conf)
+	}
 
 	client := resty.New()
-	if conf.MaxRetryWaitTime == 0 {
-		conf.RetryWaitTime = 5 * time.Second
-	}
-	if conf.Timeout == 0 {
-		conf.Timeout = 60 * time.Second
-	}
 	client.SetRetryWaitTime(conf.RetryWaitTime)
 	client.SetRetryMaxWaitTime(conf.MaxRetryWaitTime)
 	client.SetRetryCount(conf.RetryCount)
@@ -114,20 +147,13 @@ func (h *pr) newRequest() Request {
 	}
 	req.Header.Set("User-Agent", conf.UserAgent)
 	return &request{
-		c:        conf,
-		request:  req,
-		logger:   h.logger,
-		inputLog: true,
+		c:       &conf,
+		request: req,
+		logger:  h.logger,
 	}
 }
 
 type Func func(*resty.Request)
-
-// DisableLog 禁用日志
-func (h *request) DisableLog() Request {
-	h.inputLog = false
-	return h
-}
 
 // Option 执行可选参数
 func (h *request) Option(fn Func) Request {
@@ -137,7 +163,7 @@ func (h *request) Option(fn Func) Request {
 
 // log 打印日志
 func (h *request) log(t int64, res *response) {
-	if !(h.c.EnableLog && h.inputLog) {
+	if !h.c.EnableLog {
 		return
 	}
 

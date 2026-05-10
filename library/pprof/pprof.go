@@ -17,7 +17,6 @@ func Server(conf *config.Pprof, srv *thttp.Server) {
 	srv.HandleFunc("/debug/cmdline", pprofServer(pprof.Cmdline, secret, query))
 	srv.HandleFunc("/debug/profile", pprofServer(pprof.Profile, secret, query))
 	srv.HandleFunc("/debug/symbol", pprofServer(pprof.Symbol, secret, query))
-	srv.HandleFunc("/debug/symbol", pprofServer(pprof.Symbol, secret, query))
 	srv.HandleFunc("/debug/trace", pprofServer(pprof.Trace, secret, query))
 	srv.HandleFunc("/debug/allocs", pprofServer(pprof.Handler("allocs").ServeHTTP, secret, query))
 	srv.HandleFunc("/debug/block", pprofServer(pprof.Handler("block").ServeHTTP, secret, query))
@@ -31,6 +30,8 @@ func pprofServer(handler http.HandlerFunc, secret, query string) http.HandlerFun
 	return func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get(query) == secret {
 			handler.ServeHTTP(writer, request)
+		} else {
+			http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		}
 	}
 }

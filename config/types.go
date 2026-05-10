@@ -117,11 +117,17 @@ type DBInitializer struct {
 }
 
 type Redis struct {
-	Enable   bool
-	Name     string
-	Host     string
-	Username string
-	Password string
+	Enable       bool
+	Name         string
+	Host         string
+	Username     string
+	Password     string
+	DB           int           `json:"db" yaml:"db"`
+	PoolSize     int           `json:"poolSize" yaml:"poolSize"`
+	MinIdleConns int           `json:"minIdleConns" yaml:"minIdleConns"`
+	DialTimeout  time.Duration `json:"dialTimeout" yaml:"dialTimeout"`
+	ReadTimeout  time.Duration `json:"readTimeout" yaml:"readTimeout"`
+	WriteTimeout time.Duration `json:"writeTimeout" yaml:"writeTimeout"`
 }
 
 type Pool struct {

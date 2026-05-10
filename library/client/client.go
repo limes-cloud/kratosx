@@ -49,7 +49,7 @@ func (c *client) connByDirect(ctx context.Context) (*ggrpc.ClientConn, error) {
 		callOpts = append(callOpts, ggrpc.MaxCallRecvMsgSize(endpoint.MaxRecvSize*1024*1024))
 	}
 	if endpoint.MaxSendSize != 0 {
-		callOpts = append(callOpts, ggrpc.MaxCallSendMsgSize(endpoint.MaxRecvSize*1024*1024))
+		callOpts = append(callOpts, ggrpc.MaxCallSendMsgSize(endpoint.MaxSendSize*1024*1024))
 	}
 
 	opts := c.options()

@@ -40,8 +40,9 @@ type Jwt interface {
 }
 
 type jwt struct {
-	conf *config.JWT
-	rw   sync.RWMutex
+	conf      *config.JWT
+	rw        sync.RWMutex
+	whiteRegs []*regexp.Regexp
 }
 
 var (
@@ -71,6 +72,7 @@ func Init(conf *config.JWT, watcher config.Watcher) {
 
 	once.Do(func() {
 		ins = &jwt{conf: conf}
+		ins.compileWhitelist()
 
 		watcher("jwt", func(value config.Value) {
 			ins.rw.Lock()
@@ -80,8 +82,19 @@ func Init(conf *config.JWT, watcher config.Watcher) {
 				logger.Instance().Info("jwt config watch error", logger.F("err", err))
 				return
 			}
+			ins.compileWhitelist()
 		})
 	})
+}
+
+func (j *jwt) compileWhitelist() {
+	j.whiteRegs = nil
+	for p := range j.conf.Whitelist {
+		pattern := "^" + regexp.MustCompile(`\*`).ReplaceAllString(p, ".+") + "$"
+		if re, err := regexp.Compile(pattern); err == nil {
+			j.whiteRegs = append(j.whiteRegs, re)
+		}
+	}
 }
 
 func (j *jwt) Config() *config.JWT {
@@ -218,7 +231,7 @@ func (j *jwt) Renewal(ctx context.Context) (string, error) {
 		return "", errors.New("token format error")
 	}
 
-	// 判断token失效是否超过10s
+	// 判断token是否在续期窗口内：token已过期且未超过续期时间
 	exp := int64(claims["exp"].(float64))
 	now := time.Now().Unix()
 	if exp > now {
@@ -250,15 +263,7 @@ func (j *jwt) IsWhitelist(path, method string) bool {
 		return true
 	}
 
-	for p := range j.conf.Whitelist {
-		// 将*替换为匹配任意多字符的正则表达式
-		pattern := "^" + p + "$"
-		pattern = regexp.MustCompile(`\*`).ReplaceAllString(pattern, ".+")
-
-		// 编译正则表达式
-		re := regexp.MustCompile(pattern)
-
-		// 检查输入是否匹配正则表达式
+	for _, re := range j.whiteRegs {
 		if re.MatchString(path) {
 			return true
 		}
@@ -272,26 +277,35 @@ func (j *jwt) IsBlacklist(token string) bool {
 	if rd == nil {
 		return false
 	}
-	is, _ := rd.HExists(context.Background(), blackPrefix, token).Result()
-	return is
+	is, _ := rd.Exists(context.Background(), blackPrefix+":"+token).Result()
+	return is > 0
 }
 
 // AddBlacklist 添加token进入黑名单
 func (j *jwt) AddBlacklist(token string) {
 	rd := redis.Instance().Get(j.conf.Redis)
-	rd.HSet(context.Background(), blackPrefix, token, 1, j.conf.Expire)
+	if rd == nil {
+		return
+	}
+	rd.Set(context.Background(), blackPrefix+":"+token, 1, j.conf.Expire)
 }
 
 // setUnique 设置当前token为unique token
 func (j *jwt) setUnique(key, token string) {
 	rd := redis.Instance().Get(j.conf.Redis)
-	rd.HSet(context.Background(), uniquePrefix, key, token, j.conf.Expire)
+	if rd == nil {
+		return
+	}
+	rd.Set(context.Background(), uniquePrefix+":"+key, token, j.conf.Expire)
 }
 
 // CompareUniqueToken 对比是否时unique key
 func (j *jwt) CompareUniqueToken(key, token string) bool {
 	rd := redis.Instance().Get(j.conf.Redis)
-	res, _ := rd.HGet(context.Background(), uniquePrefix, key).Result()
+	if rd == nil {
+		return false
+	}
+	res, _ := rd.Get(context.Background(), uniquePrefix+":"+key).Result()
 	return res == token
 }
 

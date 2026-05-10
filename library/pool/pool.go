@@ -208,7 +208,7 @@ func (w *waitTask) Run() {
 		count++
 		select {
 		case <-w.runner.ctx.Done():
-			break
+			return
 		default:
 			if err = w.fn(); err == nil {
 				return

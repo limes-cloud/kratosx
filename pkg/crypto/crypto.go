@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
-	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -28,16 +27,8 @@ func CompareHashPwd(p1, p2 string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(p1), []byte(p2)) == nil
 }
 
-func HexToByte(hex string) []byte {
-	length := len(hex) / 2
-	slice := make([]byte, length)
-	rs := []rune(hex)
-	for i := 0; i < length; i++ {
-		s := string(rs[i*2 : i*2+2])
-		value, _ := strconv.ParseInt(s, 16, 10)
-		slice[i] = byte(value & 0xFF)
-	}
-	return slice
+func HexToByte(h string) ([]byte, error) {
+	return hex.DecodeString(h)
 }
 
 func Sha256(in []byte) string {

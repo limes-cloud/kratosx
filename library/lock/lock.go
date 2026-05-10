@@ -9,11 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/limes-cloud/kratosx/library/tasker"
-
 	"github.com/google/uuid"
 	"github.com/limes-cloud/kratosx/library/logger"
 	lredis "github.com/limes-cloud/kratosx/library/redis"
+	"github.com/limes-cloud/kratosx/library/tasker"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -140,8 +139,9 @@ func New(ctx context.Context, key string, opts ...LockOption) Lock {
 		store:  rdClient,
 		option: opt,
 	}
+
 	// 在服务关闭时释放锁，防止死锁
-	tasker.Instance().BeforeStop("release redis lock", func() {
+	tasker.Instance().BeforeStop(task.key, func() {
 		_ = task.Release()
 	})
 	return task
@@ -150,7 +150,12 @@ func New(ctx context.Context, key string, opts ...LockOption) Lock {
 // Acquire 获取锁，直到获取到为止
 func (lc *lock) Acquire() error {
 	for {
-		// 获得锁
+		select {
+		case <-lc.ctx.Done():
+			return lc.ctx.Err()
+		default:
+		}
+
 		unlock, err := lc.TryAcquire()
 		if err != nil {
 			return err
@@ -180,7 +185,7 @@ func (lc *lock) TryAcquire() (bool, error) {
 		lc.option.value,
 		strconv.Itoa(int(lc.option.timeout.Milliseconds())),
 	).Result()
-	if err != nil && err.Error() != "redis: nil" {
+	if err != nil && !errors.Is(err, redis.Nil) {
 		return false, fmt.Errorf("acquire lock error %s", err.Error())
 	}
 	if resp == nil || err != nil {
@@ -201,25 +206,31 @@ func (lc *lock) TryAcquire() (bool, error) {
 func (lc *lock) autoRenewal() {
 	lc.renewed.Store(true)
 	go func() {
+		interval := lc.option.timeout - lc.option.timeout/3
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
 		count := 0
 		for {
-			time.Sleep(lc.option.timeout - lc.option.timeout/3)
-			if lc.closed.Load() {
+			select {
+			case <-lc.ctx.Done():
 				return
-			}
-
-			count++
-			// 续期失败超过3次，则不再续期
-			if err := lc.Renewal(); err != nil {
-				if count > 3 {
-					logger.Instance().WithContext(lc.ctx).Error("lock renewal error", logger.F("error", err))
+			case <-ticker.C:
+				if lc.closed.Load() {
 					return
 				}
-				// 续期失败，等待100ms后重试，防止因为网络抖动导致续期失败
-				time.Sleep(100 * time.Millisecond)
-				continue
+
+				count++
+				if err := lc.Renewal(); err != nil {
+					if count > 3 {
+						logger.Instance().WithContext(lc.ctx).Error("lock renewal error", logger.F("error", err))
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+					continue
+				}
+				count = 0
 			}
-			count = 0
 		}
 	}()
 }
@@ -247,6 +258,7 @@ func (lc *lock) Release() error {
 	}
 
 	lc.closed.Store(true)
+	tasker.Instance().Remove(lc.key)
 	return nil
 }
 
@@ -281,6 +293,7 @@ func (lc *lock) AcquireFunc(search func() error, do func() error) error {
 
 	// 查询缓存数据，防止获取锁之后，存在
 	if err := search(); err == nil {
+		_ = lc.Release()
 		return nil
 	}
 

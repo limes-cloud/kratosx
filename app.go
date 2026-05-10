@@ -200,6 +200,7 @@ func grpcServer(c *config.GrpcService, count int, so []grpc.ServerOption) *grpc.
 	}
 
 	if c.Timeout != 0 {
+		// 禁用 kratos 内置全局超时，改由 Timeout 中间件按路由粒度管理
 		opts = append(opts, grpc.Timeout(-1))
 	}
 	return grpc.NewServer(opts...)

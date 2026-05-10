@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	"github.com/spf13/cast"
 
 	"github.com/google/uuid"
 	"github.com/limes-cloud/kratosx/pkg/crypto"
@@ -21,7 +21,13 @@ type KT interface {
 }
 
 type Cache[K KT, V any] struct {
+	km struct {
+		keys  []K
+		mu    sync.Mutex
+		valid atomic.Bool
+	}
 	val       *sync.Map
+	doMu      sync.Mutex
 	node      string
 	vs        string
 	key       string
@@ -61,6 +67,14 @@ type opItem[K KT, V any] struct {
 
 type Option[K KT, V any] func(*Cache[K, V])
 
+func (c *Cache[K, V]) onError(scene string, err error) {
+	if c.hookerror != nil {
+		c.hookerror(scene, err)
+	} else {
+		log.Printf("[cache] %s error: %v", scene, err)
+	}
+}
+
 func HookLoad[K KT, V any](fn func() (map[K]V, error)) Option[K, V] {
 	return func(c *Cache[K, V]) {
 		c.hookload = fn
@@ -87,6 +101,7 @@ func NewCache[K KT, V any](client *redis.Client, key string, opts ...Option[K, V
 
 func NewCacheAndInit[K KT, V any](ctx context.Context, client *redis.Client, key string, opts ...Option[K, V]) *Cache[K, V] {
 	lc := NewCache[K, V](client, key, opts...)
+
 	// 加载缓存,加载失败则直接报错，避免线上隐式错误。
 	if err := lc.Init(ctx); err != nil {
 		panic(err)
@@ -137,6 +152,9 @@ func (msg *Msg[K, V]) Deletes(keys []K) *Msg[K, V] {
 }
 
 func (msg *Msg[K, V]) Do() (err error) {
+	msg.cache.doMu.Lock()
+	defer msg.cache.doMu.Unlock()
+
 	oldVal := msg.cache.copy()
 	oldVs := msg.cache.vs
 
@@ -144,11 +162,12 @@ func (msg *Msg[K, V]) Do() (err error) {
 		if err != nil {
 			msg.cache.val = oldVal
 			msg.cache.vs = oldVs
+			msg.cache.km.valid.Store(false)
 		}
 	}()
 
 	// 执行操作列表
-	if err = msg.do(); err != nil {
+	if err = msg.do(false); err != nil {
 		return err
 	}
 
@@ -160,64 +179,39 @@ func (msg *Msg[K, V]) Do() (err error) {
 	return nil
 }
 
-// do 执行操作链
-func (msg *Msg[K, V]) do() error {
-	pipe := msg.cache.rd.Pipeline()
-	// 变更本地缓存
+// do 执行操作链，localOnly 为 true 时仅更新本地缓存
+func (msg *Msg[K, V]) do(localOnly bool) error {
+	msg.cache.km.valid.Store(false)
+
+	if !localOnly {
+		pipe := msg.cache.rd.Pipeline()
+		for _, item := range msg.op.List {
+			switch item.Action {
+			case opPut:
+				pipe.HSet(msg.ctx, msg.cache.cacheKey(), msg.cache.transCacheKey(item.Key), msg.cache.transCacheVal(*item.Val))
+				msg.cache.store(item.Key, *item.Val)
+			case opDel:
+				pipe.HDel(msg.ctx, msg.cache.cacheKey(), msg.cache.transCacheKey(item.Key))
+				msg.cache.delete(item.Key)
+			}
+		}
+		return msg.cache.setVersion(msg.ctx, pipe, msg.cache.version())
+	}
+
 	for _, item := range msg.op.List {
 		switch item.Action {
 		case opPut:
-			pipe.HSet(msg.ctx, msg.cache.cacheKey(), msg.cache.transCacheKey(item.Key), msg.cache.transCacheVal(*item.Val))
 			msg.cache.store(item.Key, *item.Val)
 		case opDel:
-			pipe.HDel(msg.ctx, msg.cache.cacheKey(), msg.cache.transCacheKey(item.Key))
 			msg.cache.delete(item.Key)
 		}
 	}
-
-	// 重新计算版本
-	return msg.cache.setVersion(msg.ctx, pipe, msg.cache.version())
-}
-
-func (c *Cache[K, V]) oriCacheKey(key string) K {
-	var orival any = new(K)
-	switch orival.(type) {
-	case int8:
-		return K(cast.ToInt8(key))
-	case int16:
-		return K(cast.ToInt16(key))
-	case int32:
-		return K(cast.ToInt32(key))
-	case int:
-		return K(cast.ToInt(key))
-	case int64:
-		return K(cast.ToInt64(key))
-	case uint8:
-		return K(cast.ToUint8(key))
-	case uint16:
-		return K(cast.ToUint16(key))
-	case uint32:
-		return K(cast.ToUint32(key))
-	case uint:
-		return K(cast.ToUint(key))
-	case uint64:
-		return K(cast.ToUint64(key))
-	default:
-		return orival.(K)
-	}
+	msg.cache.vs = msg.cache.version()
+	return nil
 }
 
 func (c *Cache[K, V]) transCacheKey(key K) string {
 	return fmt.Sprint(key)
-}
-
-func (c *Cache[K, V]) oriCacheVal(val string) V {
-	var cv cacheValue[V]
-	err := json.Unmarshal([]byte(val), &cv)
-	if err != nil {
-		return cv.Val
-	}
-	return cv.Val
 }
 
 func (c *Cache[K, V]) transCacheVal(val V) string {
@@ -229,11 +223,24 @@ func (c *Cache[K, V]) transCacheVal(val V) string {
 }
 
 func (c *Cache[K, V]) Keys() []K {
+	if c.km.valid.Load() {
+		return c.km.keys
+	}
+
+	c.km.mu.Lock()
+	defer c.km.mu.Unlock()
+
+	if c.km.valid.Load() {
+		return c.km.keys
+	}
+
 	var keys []K
 	c.val.Range(func(key, _ any) bool {
 		keys = append(keys, key.(K))
 		return true
 	})
+	c.km.keys = keys
+	c.km.valid.Store(true)
 	return keys
 }
 
@@ -273,7 +280,9 @@ func (c *Cache[K, V]) Version() string {
 
 // version 计算当前节点数据的版本号
 func (c *Cache[K, V]) version() string {
-	keys := c.Keys()
+	src := c.Keys()
+	keys := make([]K, len(src))
+	copy(keys, src)
 	sort.Slice(keys, func(i, j int) bool {
 		return keys[i] > keys[j]
 	})
@@ -333,15 +342,24 @@ func (msg *Msg[K, V]) broadcast() error {
 // Subscribe 监听变更
 func (c *Cache[K, V]) Subscribe(ctx context.Context) {
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		m, err := c.queue.ReceiveMessage(ctx)
 		if err != nil {
-			c.hookerror("subscribe", err)
+			if ctx.Err() != nil {
+				return
+			}
+			c.onError("subscribe", err)
 			continue
 		}
 
 		recvMsg := op[K, V]{}
 		if err := json.Unmarshal([]byte(m.Payload), &recvMsg); err != nil {
-			c.hookerror("unmarshal subscribe", err)
+			c.onError("unmarshal subscribe", err)
 			continue
 		}
 
@@ -354,19 +372,26 @@ func (c *Cache[K, V]) Subscribe(ctx context.Context) {
 		for _, item := range recvMsg.List {
 			oper.addOp(item.Action, item.Key, item.Val)
 		}
-		_ = oper.do()
+		c.doMu.Lock()
+		_ = oper.do(true)
+		c.doMu.Unlock()
 	}
 }
 
 // Init 初始化数据
 func (c *Cache[K, V]) Init(ctx context.Context) error {
+	if c.hookload == nil {
+		return fmt.Errorf("hookload is not configured")
+	}
 	ms, err := c.hookload()
 	if err != nil {
 		return err
 	}
+
 	for k, v := range ms {
 		c.val.Store(k, v)
 	}
+	c.km.valid.Store(false)
 
 	// 获取当前的版本
 	rvs, _ := c.rd.Get(ctx, c.versionKey()).Result()
@@ -375,7 +400,7 @@ func (c *Cache[K, V]) Init(ctx context.Context) error {
 		pipe := c.rd.Pipeline()
 		pipe.Del(ctx, c.cacheKey())
 		for k, v := range ms {
-			pipe.HSet(context.Background(), c.cacheKey(), c.transCacheKey(k), c.transCacheVal(v))
+			pipe.HSet(ctx, c.cacheKey(), c.transCacheKey(k), c.transCacheVal(v))
 		}
 		if err := c.setVersion(ctx, pipe, c.version()); err != nil {
 			return err
@@ -387,8 +412,15 @@ func (c *Cache[K, V]) Init(ctx context.Context) error {
 
 // Repair 定时修复缓存，避免变更监听失败
 func (c *Cache[K, V]) Repair(ctx context.Context) {
+	ticker := time.NewTicker(c.wt)
+	defer ticker.Stop()
 	for {
-		time.Sleep(c.wt)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+
 		// 查询当前的版本号
 		version, err := c.rd.Get(ctx, c.versionKey()).Result()
 		if err != nil {
@@ -401,12 +433,42 @@ func (c *Cache[K, V]) Repair(ctx context.Context) {
 		}
 
 		// 重新加载缓存
+		if c.hookload == nil {
+			continue
+		}
 		m, err := c.hookload()
 		if err != nil {
-			c.hookerror("repair load", err)
+			c.onError("repair load", err)
+			continue
 		}
+
+		c.doMu.Lock()
+
+		// 替换本地缓存：先删除旧key，再写入新数据
+		c.val.Range(func(key, _ any) bool {
+			k := key.(K)
+			if _, ok := m[k]; !ok {
+				c.val.Delete(k)
+			}
+			return true
+		})
 		for k, v := range m {
 			c.val.Store(k, v)
 		}
+		c.km.valid.Store(false)
+
+		// 同步到 Redis
+		pipe := c.rd.Pipeline()
+		pipe.Del(ctx, c.cacheKey())
+		for k, v := range m {
+			pipe.HSet(ctx, c.cacheKey(), c.transCacheKey(k), c.transCacheVal(v))
+		}
+		vs := c.version()
+		c.vs = vs
+		pipe.Set(ctx, c.versionKey(), vs, redis.KeepTTL)
+		if _, err := pipe.Exec(ctx); err != nil {
+			c.onError("repair sync", err)
+		}
+		c.doMu.Unlock()
 	}
 }

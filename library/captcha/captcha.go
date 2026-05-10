@@ -131,7 +131,7 @@ func WithVerifiedDelete(is bool) OptionFunc {
 	}
 }
 
-// WithContext 验证成功后是否删除验证码
+// WithContext 设置上下文
 func WithContext(ctx context.Context) OptionFunc {
 	return func(c *captcha) {
 		c.ctx = ctx
@@ -181,7 +181,10 @@ func (c *captcha) VerifyCaptcha(req *VerifyCaptchaRequest) error {
 	aid := c.aid(req.Scene, req.User, req.VerifyCode)
 
 	// 判断验证码是否正确,或过期
-	oriAid, _ := c.redis.Get(c.ctx, uid).Result()
+	oriAid, err := c.redis.Get(c.ctx, uid).Result()
+	if err != nil {
+		return errorInvalidCaptcha
+	}
 	if oriAid != aid {
 		return errorInvalidCaptcha
 	}
@@ -193,9 +196,19 @@ func (c *captcha) VerifyCaptcha(req *VerifyCaptchaRequest) error {
 	return nil
 }
 
+// incrLimitScript 原子检查并递增每日计数，返回递增后的值
+// KEYS[1] = sid, ARGV[1] = limit, ARGV[2] = ttl(ms)
+// 返回: 递增后的计数值
+var incrLimitScript = redis.NewScript(`
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+	redis.call("PEXPIRE", KEYS[1], ARGV[2])
+end
+return count
+`)
+
 // GetCaptcha 获取验证码
 func (c *captcha) GetCaptcha(req *GetCaptchaRequest) (*GetCaptchaResponse, error) {
-
 	// 生成随机验证码
 	verifyCode := c.randomCode(c.length)
 	if req.VerifyCode != "" {
@@ -205,10 +218,14 @@ func (c *captcha) GetCaptcha(req *GetCaptchaRequest) (*GetCaptchaResponse, error
 	// 获取当前场景下客户端的唯一id
 	sid := c.sid(req.Scene, req.ClientIP)
 
-	// 判断是否超过最大的获取次数
+	// 原子判断并递增每日获取次数
 	if c.limit != 0 {
-		var count int
-		_ = c.redis.Get(c.ctx, sid).Scan(&count)
+		now := time.Now()
+		ttl := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location()).Sub(now)
+		count, err := incrLimitScript.Run(c.ctx, c.redis, []string{sid}, c.limit, ttl.Milliseconds()).Int()
+		if err != nil {
+			return nil, err
+		}
 		if count > c.limit {
 			return nil, errorLimit
 		}
@@ -234,12 +251,6 @@ func (c *captcha) GetCaptcha(req *GetCaptchaRequest) (*GetCaptchaResponse, error
 		return nil, err
 	}
 
-	// 当天请求次数累计
-	now := time.Now()
-	endTime := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), now.Location())
-	if !c.redis.SetNX(c.ctx, sid, 1, endTime.Sub(now)).Val() {
-		_ = c.redis.Incr(c.ctx, sid)
-	}
 
 	return &GetCaptchaResponse{
 		UUID:       c.getUUIDByUID(uid),
@@ -286,12 +297,12 @@ func (c *captcha) sid(scene, ip string) string {
 	return fmt.Sprintf("captcha:s:%x", md5.Sum([]byte(fmt.Sprintf("%s:%s", scene, ip))))
 }
 
-// sid 生成当前场景下客户端手机号的唯一id
+// uid 生成当前场景下客户端用户的唯一id
 func (c *captcha) uid(sid, user string) string {
 	return fmt.Sprintf("captcha:u:%x", md5.Sum([]byte(fmt.Sprintf("%s:%s", sid, user))))
 }
 
-// sid 生成当前场景下客户端手机号的唯一id
+// getUUIDByUID 从uid中提取uuid
 func (c *captcha) getUUIDByUID(uid string) string {
 	return strings.TrimPrefix(uid, "captcha:u:")
 }
@@ -301,7 +312,7 @@ func (c *captcha) getUIDByUUID(uuid string) string {
 	return fmt.Sprintf("captcha:u:%s", uuid)
 }
 
-// uuid 生成验证码的唯一uid
+// aid 生成验证码答案的唯一标识
 func (c *captcha) aid(scene, user, answer string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s:%s:%s", scene, user, answer))))
 }

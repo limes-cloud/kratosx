@@ -58,12 +58,30 @@ func (r *redis) initRedis(conf *config.Redis) error {
 	if !conf.Enable {
 		return nil
 	}
-	// 连接主数据库
-	client := goredis.NewClient(&goredis.Options{
+
+	opts := &goredis.Options{
 		Addr:     conf.Host,
 		Username: conf.Username,
 		Password: conf.Password,
-	})
+		DB:       conf.DB,
+	}
+	if conf.PoolSize > 0 {
+		opts.PoolSize = conf.PoolSize
+	}
+	if conf.MinIdleConns > 0 {
+		opts.MinIdleConns = conf.MinIdleConns
+	}
+	if conf.DialTimeout > 0 {
+		opts.DialTimeout = conf.DialTimeout
+	}
+	if conf.ReadTimeout > 0 {
+		opts.ReadTimeout = conf.ReadTimeout
+	}
+	if conf.WriteTimeout > 0 {
+		opts.WriteTimeout = conf.WriteTimeout
+	}
+
+	client := goredis.NewClient(opts)
 
 	if err := client.Ping(context.Background()).Err(); err != nil {
 		return err

@@ -65,7 +65,9 @@ func Init(conf map[string]string, watcher config.Watcher) {
 			initFunc()
 		})
 
+		ins.mux.Lock()
 		initFunc()
+		ins.mux.Unlock()
 	})
 }
 
@@ -76,21 +78,18 @@ func (c *loader) Get(name string) []byte {
 	return c.set[name]
 }
 
-// initLoader 初始化加载器
+// initLoader 初始化加载器（调用方需持有锁）
 func (c *loader) initLoader(name string, path string) error {
-	// 获取文件内容
 	file, err := os.Open(path)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	all, err := io.ReadAll(file)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
-	c.mux.Lock()
 	c.set[name] = all
-	c.mux.Unlock()
 	return nil
 }

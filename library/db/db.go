@@ -44,9 +44,10 @@ type DB interface {
 }
 
 type db struct {
-	cfs map[string]*config.Database
-	set map[string]*gorm.DB
-	key string
+	cfs    map[string]*config.Database
+	set    map[string]*gorm.DB
+	drives map[string]string
+	key    string
 }
 
 // List 数据数据库列表
@@ -69,12 +70,17 @@ func (d *db) List() []*gorm.DB {
 }
 
 func (d *db) Entities() []*Entity {
-	var (
-		dbs  = d.List()
-		list []*Entity
-	)
-	for _, item := range dbs {
-		list = append(list, d.loadEntities(item)...)
+	var list []*Entity
+	var keys []string
+	for key := range d.set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if d.set[key] == nil {
+			continue
+		}
+		list = append(list, d.loadEntities(d.set[key], d.drives[key])...)
 	}
 	return list
 }
@@ -109,7 +115,8 @@ func Init(cfs []*config.Database, opts ...Option) {
 		}
 
 		ins = &db{
-			set: make(map[string]*gorm.DB),
+			set:    make(map[string]*gorm.DB),
+			drives: make(map[string]string),
 		}
 
 		// 遍历配置连接数据库
@@ -132,7 +139,11 @@ func (d *db) initFactory(conf *config.Database, opt *options) error {
 	}
 
 	// 连接主数据库
-	client, err := gorm.Open(d.open(conf), &gorm.Config{
+	dialector, err := d.open(conf)
+	if err != nil {
+		return err
+	}
+	client, err := gorm.Open(dialector, &gorm.Config{
 		Logger: newLog(conf.Config.LogLevel, conf.Config.SlowThreshold),
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix:   conf.Config.TablePrefix,
@@ -177,7 +188,10 @@ func (d *db) initFactory(conf *config.Database, opt *options) error {
 		}
 	}
 
-	sdb, _ := client.DB()
+	sdb, err := client.DB()
+	if err != nil || sdb == nil {
+		return fmt.Errorf("get database instance error: %v", err)
+	}
 	sdb.SetConnMaxLifetime(conf.Config.MaxLifetime)
 	sdb.SetMaxOpenConns(conf.Config.MaxOpenConn)
 	sdb.SetMaxIdleConns(conf.Config.MaxIdleConn)
@@ -186,6 +200,7 @@ func (d *db) initFactory(conf *config.Database, opt *options) error {
 	registerHook(conf.Name, conf.Connect.DBName, client, opt.hook)
 
 	d.set[conf.Name] = client
+	d.drives[conf.Name] = conf.Drive
 	return nil
 }
 
@@ -212,7 +227,7 @@ func (d *db) Get(name ...string) *gorm.DB {
 	return d.set[key]
 }
 
-func (d *db) open(conf *config.Database) gorm.Dialector {
+func (d *db) open(conf *config.Database) (gorm.Dialector, error) {
 	switch conf.Drive {
 	case _mysql, _tidb:
 		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s%s",
@@ -223,7 +238,7 @@ func (d *db) open(conf *config.Database) gorm.Dialector {
 			conf.Connect.DBName,
 			conf.Connect.Option,
 		)
-		return mysql.Open(dsn)
+		return mysql.Open(dsn), nil
 	case _postgresql:
 		dsn := fmt.Sprintf("host=%s user=%s password=%s port=%d",
 			conf.Connect.Host,
@@ -234,7 +249,7 @@ func (d *db) open(conf *config.Database) gorm.Dialector {
 		if conf.Connect.DBName != "" {
 			dsn += fmt.Sprintf(" dbname=%s %s", conf.Connect.DBName, conf.Connect.Option)
 		}
-		return postgres.Open(dsn)
+		return postgres.Open(dsn), nil
 	case _sqlServer:
 		dsn := fmt.Sprintf("sqlserver://%s:%s@%s:%d",
 			conf.Connect.Username,
@@ -246,53 +261,103 @@ func (d *db) open(conf *config.Database) gorm.Dialector {
 			dsn += fmt.Sprintf("?database=%s", conf.Connect.DBName)
 		}
 
-		return sqlserver.Open(dsn)
+		return sqlserver.Open(dsn), nil
 	default:
-		return nil
+		return nil, fmt.Errorf("unsupported database driver: %s", conf.Drive)
 	}
 }
 
 func (d *db) create(conf *config.Database) error {
+	if !isValidDBName(conf.Connect.DBName) {
+		return fmt.Errorf("invalid database name: %s", conf.Connect.DBName)
+	}
+
 	copyConf := *conf
 	copyConf.Connect.DBName = ""
 	copyConf.Connect.Option = ""
 
-	connect, err := gorm.Open(d.open(&copyConf))
+	dialector, err := d.open(&copyConf)
+	if err != nil {
+		return err
+	}
+	connect, err := gorm.Open(dialector)
 	if err != nil {
 		return err
 	}
 
+	var sql string
+	switch conf.Drive {
+	case _mysql, _tidb:
+		sql = fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", conf.Connect.DBName)
+	case _postgresql:
+		sql = fmt.Sprintf(`SELECT 'CREATE DATABASE "%s"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '%s')`, conf.Connect.DBName, conf.Connect.DBName)
+	case _sqlServer:
+		sql = fmt.Sprintf("IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = '%s') CREATE DATABASE [%s]", conf.Connect.DBName, conf.Connect.DBName)
+	default:
+		return fmt.Errorf("unsupported driver for auto create database: %s", conf.Drive)
+	}
+
 	_ = connect.Session(&gorm.Session{
 		Logger: glogger.Default.LogMode(glogger.Silent),
-	}).Exec(fmt.Sprintf("CREATE DATABASE %s", conf.Connect.DBName)).Error
+	}).Exec(sql).Error
 
 	return nil
 }
 
+func isValidDBName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, c := range name {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 // loadEntities 加载实体
-func (d *db) loadEntities(db *gorm.DB) []*Entity {
-	// 获取全部表
+func (d *db) loadEntities(db *gorm.DB, drive string) []*Entity {
 	var (
 		tables []string
 		list   []*Entity
 	)
-	db.Raw("show tables").Scan(&tables)
+
 	database := db.Migrator().CurrentDatabase()
-	for _, table := range tables {
-		// 获取表comment
-		tSql := "select table_name as name,table_comment as comment from information_schema.tables where table_schema = ? and table_name = ?"
-		entity := Entity{}
-		db.Raw(tSql, database, table).Scan(&entity)
-		entity.Database = database
 
-		cSql := "select column_name as name, column_comment as comment from information_schema.columns where table_schema = ? AND table_name = ?"
-		columns := make([]Field, 0)
-		db.Raw(cSql, database, table).Scan(&columns)
+	switch drive {
+	case _mysql, _tidb:
+		db.Raw("SHOW TABLES").Scan(&tables)
+		for _, table := range tables {
+			entity := Entity{Database: database}
+			db.Raw("SELECT table_name AS name, table_comment AS comment FROM information_schema.tables WHERE table_schema = ? AND table_name = ?", database, table).Scan(&entity)
 
-		// 关联表
-		entity.Fields = columns
+			var columns []Field
+			db.Raw("SELECT column_name AS name, column_comment AS comment FROM information_schema.columns WHERE table_schema = ? AND table_name = ?", database, table).Scan(&columns)
+			entity.Fields = columns
+			list = append(list, &entity)
+		}
+	case _postgresql:
+		db.Raw("SELECT tablename FROM pg_tables WHERE schemaname = 'public'").Scan(&tables)
+		for _, table := range tables {
+			entity := Entity{Database: database, Name: table}
 
-		list = append(list, &entity)
+			var columns []Field
+			db.Raw("SELECT column_name AS name, col_description((table_schema||'.'||table_name)::regclass, ordinal_position) AS comment FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ?", table).Scan(&columns)
+			entity.Fields = columns
+			list = append(list, &entity)
+		}
+	case _sqlServer:
+		db.Raw("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'").Scan(&tables)
+		for _, table := range tables {
+			entity := Entity{Database: database, Name: table}
+
+			var columns []Field
+			db.Raw("SELECT c.COLUMN_NAME AS name, CAST(ep.value AS NVARCHAR(500)) AS comment FROM INFORMATION_SCHEMA.COLUMNS c LEFT JOIN sys.extended_properties ep ON ep.major_id = OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME) AND ep.minor_id = c.ORDINAL_POSITION AND ep.name = 'MS_Description' WHERE c.TABLE_NAME = ?", table).Scan(&columns)
+			entity.Fields = columns
+			list = append(list, &entity)
+		}
 	}
+
 	return list
 }

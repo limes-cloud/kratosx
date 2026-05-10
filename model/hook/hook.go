@@ -563,7 +563,18 @@ func transVal(kind reflect.Kind, val uint32) any {
 func buildQuery(table string, group *ConditionGroup, params *[]interface{}) string {
 	var whereClauses []string
 
+	logic := strings.ToUpper(group.Logic)
+	if logic != "AND" && logic != "OR" {
+		logic = "AND"
+	}
+
 	for _, condition := range group.Conditions {
+		if !isValidColumnName(condition.Field) {
+			continue
+		}
+		if !isValidOperator(condition.Operator) {
+			continue
+		}
 		placeholder := "?"
 		whereClause := fmt.Sprintf("`%s`.`%s` %s %s", table, condition.Field, condition.Operator, placeholder)
 		whereClauses = append(whereClauses, whereClause)
@@ -578,8 +589,32 @@ func buildQuery(table string, group *ConditionGroup, params *[]interface{}) stri
 	}
 
 	if len(whereClauses) > 0 {
-		return strings.Join(whereClauses, fmt.Sprintf(" %s ", group.Logic))
+		return strings.Join(whereClauses, fmt.Sprintf(" %s ", logic))
 	}
 
 	return ""
+}
+
+var validOperators = map[string]bool{
+	"=": true, "!=": true, "<>": true,
+	">": true, "<": true, ">=": true, "<=": true,
+	"LIKE": true, "NOT LIKE": true,
+	"IN": true, "NOT IN": true,
+	"IS NULL": true, "IS NOT NULL": true,
+}
+
+func isValidOperator(op string) bool {
+	return validOperators[strings.ToUpper(strings.TrimSpace(op))]
+}
+
+func isValidColumnName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, c := range name {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
 }

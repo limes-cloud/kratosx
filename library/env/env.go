@@ -142,7 +142,7 @@ func (env *env) AppVersion() string {
 	if env.appVersion == "" {
 		env.appVersion = os.Getenv(appVersion)
 	}
-	return os.Getenv(appVersion)
+	return env.appVersion
 }
 
 // SetAppVersion 设置应用版本

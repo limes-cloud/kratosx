@@ -86,7 +86,7 @@ type Context interface {
 	SetMetadata(key, value string)
 
 	// Request 获取http请求工具
-	Request() request.Request
+	Request(opts ...request.OptionFunc) request.Request
 
 	// GrpcConn 获取grpc连接
 	GrpcConn(srvName string) (*grpc.ClientConn, error)
@@ -229,13 +229,17 @@ func (c *ctx) JWT() jwt.Jwt {
 }
 
 // Request 带链路日志的请求工具
-func (c *ctx) Request() request.Request {
-	return request.Instance(c)
+func (c *ctx) Request(opts ...request.OptionFunc) request.Request {
+	return request.Instance(c, opts...)
 }
 
 // Token 获取令牌验证器
 func (c *ctx) Token() string {
-	return jwt.Instance().GetToken(c.Context)
+	j := jwt.Instance()
+	if j == nil {
+		return ""
+	}
+	return j.GetToken(c.Context)
 }
 
 // GetMetadata 获取元数据信息
@@ -248,7 +252,7 @@ func (c *ctx) GetMetadata(key string) string {
 
 // SetMetadata 设置元数据信息
 func (c *ctx) SetMetadata(key, value string) {
-	c.Context = md.AppendToClientContext(context.Background(), key, value)
+	c.Context = md.AppendToClientContext(c.Context, key, value)
 }
 
 // Config 获取配置对象
