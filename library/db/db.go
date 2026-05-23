@@ -121,6 +121,9 @@ func Init(cfs []*config.Database, opts ...Option) {
 
 		// 遍历配置连接数据库
 		for ind, conf := range cfs {
+			if !conf.Enable {
+				continue
+			}
 			if err := ins.initFactory(conf, o); err != nil {
 				panic("database init error :" + err.Error())
 			}
