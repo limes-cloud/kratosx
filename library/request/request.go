@@ -113,6 +113,9 @@ func Instance(ctx context.Context, opts ...OptionFunc) Request {
 
 // Init 初始化
 func Init(conf *config.Request, watcher config.Watcher) {
+	if conf == nil {
+		conf = &config.Request{EnableLog: true, RetryCount: 0, Timeout: 60 * time.Second}
+	}
 	once.Do(func() {
 		ins = &pr{conf: *conf}
 
