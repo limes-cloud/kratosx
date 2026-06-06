@@ -200,7 +200,7 @@ func (c *ctx) Redis(name ...string) *redis.Client {
 
 // Pool 获取并发池实例
 func (c *ctx) Pool() pool.Pool {
-	return pool.Instance()
+	return pool.Instance().WithContext(c.Ctx())
 }
 
 // Loader 获加载器实例

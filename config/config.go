@@ -37,6 +37,7 @@ func New(ls ...kconfig.Source) Config {
 	instance = &config{
 		ins: kconfig.New(
 			kconfig.WithSource(ls...),
+			kconfig.WithResolver(resolvePlaceholders),
 		),
 	}
 	return instance
