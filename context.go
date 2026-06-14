@@ -342,9 +342,9 @@ func (c *ctx) Value(key any) any {
 }
 
 type ContextOption struct {
-	Trace      string
-	Span       string
-	SkipDBHook bool
+	Trace  string
+	Span   string
+	DBHook bool
 }
 
 type ContextOptionFunc func(*ContextOption)
@@ -357,9 +357,10 @@ func WithTrace(trace string, span string) ContextOptionFunc {
 	}
 }
 
-func WithSkipDBHook() ContextOptionFunc {
+// WithHook 启用当前上下文中的 DB hook。
+func WithHook() ContextOptionFunc {
 	return func(o *ContextOption) {
-		o.SkipDBHook = true
+		o.DBHook = true
 	}
 }
 
@@ -374,8 +375,8 @@ func MustContext(c context.Context, opts ...ContextOptionFunc) Context {
 		c = withTraceContext(c, o.Trace, o.Span)
 	}
 
-	if o.SkipDBHook {
-		c = context.WithValue(c, db.SkipHookKey, true)
+	if o.DBHook {
+		c = db.WithHook(c)
 	}
 
 	app, _ := kratos.FromContext(c)

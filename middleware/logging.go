@@ -22,10 +22,12 @@ func Logging(conf *ec.Logging) middleware.Middleware {
 		logging.Server(logger.New(logger.WithCallerSkip(-1)))).
 		Match(func(ctx context.Context, operation string) bool {
 			path := ""
+			oldPath := ""
 			if h, is := http.RequestFromServerContext(ctx); is {
-				path = h.Method + ":" + h.URL.Path
+				path = h.URL.Path + ":" + h.Method
+				oldPath = h.Method + ":" + h.URL.Path
 			}
 			lgIns := lg.Instance()
-			return !(lgIns.IsWhitelist(operation) || lgIns.IsWhitelist(path))
+			return !(lgIns.IsWhitelist(operation) || lgIns.IsWhitelist(path) || lgIns.IsWhitelist(oldPath))
 		}).Build()
 }

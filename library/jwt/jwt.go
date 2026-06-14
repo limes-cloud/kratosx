@@ -258,7 +258,7 @@ func (j *jwt) IsWhitelist(path, method string) bool {
 		return true
 	}
 
-	path = j.path(method, path)
+	path = j.path(path, method)
 	if j.conf.Whitelist[path] {
 		return true
 	}

@@ -334,9 +334,10 @@ func (d *db) loadEntities(db *gorm.DB, drive string) []*Entity {
 		for _, table := range tables {
 			entity := Entity{Database: database}
 			db.Raw("SELECT table_name AS name, table_comment AS comment FROM information_schema.tables WHERE table_schema = ? AND table_name = ?", database, table).Scan(&entity)
+			entity.Database = database
 
 			var columns []Field
-			db.Raw("SELECT column_name AS name, column_comment AS comment FROM information_schema.columns WHERE table_schema = ? AND table_name = ?", database, table).Scan(&columns)
+			db.Raw("SELECT column_name AS name, column_comment AS comment FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position", database, table).Scan(&columns)
 			entity.Fields = columns
 			list = append(list, &entity)
 		}
@@ -346,7 +347,7 @@ func (d *db) loadEntities(db *gorm.DB, drive string) []*Entity {
 			entity := Entity{Database: database, Name: table}
 
 			var columns []Field
-			db.Raw("SELECT column_name AS name, col_description((table_schema||'.'||table_name)::regclass, ordinal_position) AS comment FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ?", table).Scan(&columns)
+			db.Raw("SELECT column_name AS name, col_description((table_schema||'.'||table_name)::regclass, ordinal_position) AS comment FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ? ORDER BY ordinal_position", table).Scan(&columns)
 			entity.Fields = columns
 			list = append(list, &entity)
 		}
@@ -356,7 +357,7 @@ func (d *db) loadEntities(db *gorm.DB, drive string) []*Entity {
 			entity := Entity{Database: database, Name: table}
 
 			var columns []Field
-			db.Raw("SELECT c.COLUMN_NAME AS name, CAST(ep.value AS NVARCHAR(500)) AS comment FROM INFORMATION_SCHEMA.COLUMNS c LEFT JOIN sys.extended_properties ep ON ep.major_id = OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME) AND ep.minor_id = c.ORDINAL_POSITION AND ep.name = 'MS_Description' WHERE c.TABLE_NAME = ?", table).Scan(&columns)
+			db.Raw("SELECT c.COLUMN_NAME AS name, CAST(ep.value AS NVARCHAR(500)) AS comment FROM INFORMATION_SCHEMA.COLUMNS c LEFT JOIN sys.extended_properties ep ON ep.major_id = OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME) AND ep.minor_id = c.ORDINAL_POSITION AND ep.name = 'MS_Description' WHERE c.TABLE_NAME = ? ORDER BY c.ORDINAL_POSITION", table).Scan(&columns)
 			entity.Fields = columns
 			list = append(list, &entity)
 		}

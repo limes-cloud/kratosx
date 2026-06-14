@@ -1,13 +1,22 @@
 package db
 
 import (
+	"context"
+
 	"github.com/limes-cloud/kratosx/model/hook"
 	"gorm.io/gorm"
 )
 
+type hookKey struct{}
+
 var (
-	SkipHookKey = struct{}{}
+	HookKey = hookKey{}
 )
+
+// WithHook 启用当前上下文中的 DB hook。
+func WithHook(ctx context.Context) context.Context {
+	return context.WithValue(ctx, HookKey, true)
+}
 
 func registerHook(name string, dbName string, dbClient *gorm.DB, scope hook.ScopeRequestFunc) {
 	_ = dbClient.Callback().Query().Before("gorm:query").Register(name+":gorm:query", func(idb *gorm.DB) {
@@ -28,8 +37,8 @@ func registerHook(name string, dbName string, dbClient *gorm.DB, scope hook.Scop
 }
 
 func apply(idb *gorm.DB, dbName, method string, req hook.ScopeRequestFunc) {
-	skip, _ := idb.Statement.Context.Value(SkipHookKey).(bool)
-	if skip {
+	enable, _ := idb.Statement.Context.Value(HookKey).(bool)
+	if !enable {
 		return
 	}
 	hook.Apply(idb, dbName, method, req)

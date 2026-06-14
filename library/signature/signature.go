@@ -93,51 +93,60 @@ func Init(ec *config.Signature, watcher config.Watcher) {
 	})
 }
 
+func bodyHash(content []byte) string {
+	h := sha256.Sum256(content)
+	return hex.EncodeToString(h[:])
+}
+
+func stringToSign(timestamp string, content []byte) string {
+	return fmt.Sprintf("HMAC-SHA256\n%s\n%s", timestamp, bodyHash(content))
+}
+
 // Generate 生成签名
 func (s *signature) Generate(content []byte) (int64, string, error) {
 	ts := time.Now().Unix()
 	timestamp := strconv.FormatInt(ts, 10)
-	// 添加时间戳
-	content = append(content, []byte(fmt.Sprintf("|%s", timestamp))...)
-	// 添加ak
-	content = append(content, []byte(fmt.Sprintf("|%s", s.conf.Ak))...)
-	// 加签
-	her := hmac.New(sha256.New, []byte(s.conf.Sk))
-	her.Write(content)
-	return ts, hex.EncodeToString(her.Sum(nil)), nil
+	mac := hmac.New(sha256.New, []byte(s.conf.Sk))
+	mac.Write([]byte(stringToSign(timestamp, content)))
+	return ts, hex.EncodeToString(mac.Sum(nil)), nil
 }
 
 // Verify 验证签名
 func (s *signature) Verify(content []byte, sign string, ts int64) error {
-	// 解码
 	sig, err := hex.DecodeString(sign)
 	if err != nil {
 		return err
 	}
-
 	if int64(s.conf.Expire.Seconds()) < (time.Now().Unix() - ts) {
 		return errors.New("signature has expired")
 	}
-
 	timestamp := strconv.FormatInt(ts, 10)
-	// 添加时间戳
-	content = append(content, []byte(fmt.Sprintf("|%s", timestamp))...)
-	// 添加ak
-	content = append(content, []byte(fmt.Sprintf("|%s", s.conf.Ak))...)
-	// 验签
-	her := hmac.New(sha256.New, []byte(s.conf.Sk))
-	her.Write(content)
-	if !hmac.Equal(sig, her.Sum(nil)) {
+	mac := hmac.New(sha256.New, []byte(s.conf.Sk))
+	mac.Write([]byte(stringToSign(timestamp, content)))
+	if !hmac.Equal(sig, mac.Sum(nil)) {
 		return errors.New("signature is invalid")
 	}
 	return nil
 }
 
-// IsWhitelist 判断是否为白名单
 func (s *signature) IsWhitelist(name string) bool {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 	return s.conf.Whitelist[name]
+}
+
+// shouldVerify 判断当前接口是否需要签名校验
+func (s *signature) shouldVerify(operation string, path string) bool {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
+
+	if s.conf.Whitelist[operation] || s.conf.Whitelist[path] {
+		return false
+	}
+	if len(s.conf.OnlyList) > 0 {
+		return s.conf.OnlyList[operation] || s.conf.OnlyList[path]
+	}
+	return true
 }
 
 // Server 服务端签名中间件
@@ -175,9 +184,9 @@ func (s *signature) Server() middleware.Middleware {
 	}).Match(func(ctx context.Context, operation string) bool {
 		path := ""
 		if h, is := http.RequestFromServerContext(ctx); is {
-			path = h.Method + ":" + h.URL.Path
+			path = h.URL.Path + ":" + h.Method
 		}
-		return !(s.IsWhitelist(operation) || s.IsWhitelist(path))
+		return s.shouldVerify(operation, path)
 	}).Build()
 }
 

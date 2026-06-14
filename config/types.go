@@ -237,6 +237,7 @@ type Signature struct {
 	Ak        string
 	Sk        string
 	Whitelist map[string]bool
+	OnlyList  map[string]bool
 	Expire    time.Duration
 }
 

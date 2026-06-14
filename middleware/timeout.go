@@ -26,8 +26,11 @@ func Timeout(gs *ec.GrpcService, hs *ec.HttpService) middleware.Middleware {
 				}
 			}
 			if h, is := http.RequestFromServerContext(ctx); is && hs != nil {
-				key := fmt.Sprintf("%s:%s", h.Method, h.URL.Path)
+				key := fmt.Sprintf("%s:%s", h.URL.Path, h.Method)
 				t, ok := hs.TimeoutSpecial[key]
+				if !ok {
+					t, ok = hs.TimeoutSpecial[fmt.Sprintf("%s:%s", h.Method, h.URL.Path)]
+				}
 				if ok {
 					timeout = t
 				} else {
