@@ -68,8 +68,6 @@ type ScopeResponse interface {
 	UserDeptId(uint32) uint32
 	// Condition 条件约束
 	Condition() *ConditionGroup
-	// Fields 查询字段
-	Fields() []string
 }
 
 var tagReg = regexp.MustCompile(`\[(.*?)\]`)
@@ -140,7 +138,6 @@ func Apply(d *gorm.DB, dbName, method string, req ScopeRequestFunc) {
 		applyWhere(d, Update, hfs)
 		applyCondition(d, curResp)
 	case Read:
-		applySelect(d, curResp)
 		applyWhere(d, Read, hfs)
 		applyCondition(d, curResp)
 		applyJoinQuery(d, dbName, method, req)
@@ -316,24 +313,6 @@ func applyCondition(d *gorm.DB, resp ScopeResponse) {
 		return
 	}
 	d = d.Where(whereClause, params...)
-}
-
-func applySelect(d *gorm.DB, resp ScopeResponse) {
-	fields := resp.Fields()
-	if len(fields) == 0 {
-		return
-	}
-	selects := make([]clause.Column, 0, len(fields))
-	for _, field := range fields {
-		if col, ok := selectColumn(d.Statement.Table, field); ok {
-			selects = append(selects, col)
-		}
-	}
-	if len(selects) == 0 {
-		return
-	}
-	d.Statement.Selects = nil
-	d.Statement.AddClause(clause.Select{Distinct: d.Statement.Distinct, Columns: selects})
 }
 
 // setValue 设置指定值到指定字段
@@ -577,20 +556,6 @@ func uint32Values(values []uint32) []interface{} {
 	return res
 }
 
-func selectColumn(table string, field string) (clause.Column, bool) {
-	field = strings.TrimSpace(field)
-	if field == "" {
-		return clause.Column{}, false
-	}
-	parts := strings.Split(field, ".")
-	if len(parts) == 1 {
-		return clause.Column{Table: table, Name: parts[0]}, true
-	}
-	if len(parts) == 2 && isValidColumnName(parts[0]) && isValidColumnName(parts[1]) {
-		return clause.Column{Table: parts[0], Name: parts[1]}, true
-	}
-	return clause.Column{}, false
-}
 
 func quotedColumn(stmt *gorm.Statement, table string, field string) string {
 	return stmt.Quote(clause.Column{Table: table, Name: field})

@@ -3,12 +3,14 @@ package kratosx
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/limes-cloud/kratosx/library/recovery"
 
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/limes-cloud/kratosx/library/tasker"
+	"github.com/limes-cloud/kratosx/pkg/appkey"
 	"github.com/limes-cloud/kratosx/pkg/ua"
 
 	"github.com/go-kratos/kratos/v2"
@@ -75,6 +77,14 @@ type Context interface {
 
 	// Token 获取JwtToken
 	Token() string
+
+	// AppKey 获取当前应用标识
+	// 传入非空 app 参数时直接返回该值（用于显式指定数据域 app，如超级管理端跨应用管理）；
+	// 不传或为空时回退到 metadata / X-App-Key 请求头解析。
+	AppKey(app ...string) string
+
+	// SetAppKey 设置当前应用标识
+	SetAppKey(appKey string)
 
 	// Ctx 获取行下文ctx
 	Ctx() context.Context
@@ -147,6 +157,11 @@ type ctx struct {
 	context.Context
 	kratos.AppInfo
 }
+
+const (
+	AppKeyMetadataKey = appkey.MetadataKey
+	AppKeyHeaderKey   = appkey.HeaderKey
+)
 
 // Database 获取数据库
 func (c *ctx) Database() db.DB {
@@ -247,12 +262,53 @@ func (c *ctx) GetMetadata(key string) string {
 	if values, ok := metadata.FromServerContext(c.Context); ok {
 		return values.Get(key)
 	}
+	if values, ok := metadata.FromClientContext(c.Context); ok {
+		return values.Get(key)
+	}
 	return ""
 }
 
 // SetMetadata 设置元数据信息
 func (c *ctx) SetMetadata(key, value string) {
+	if value == "" {
+		return
+	}
+	if values, ok := metadata.FromServerContext(c.Context); ok {
+		values.Set(key, value)
+	}
 	c.Context = md.AppendToClientContext(c.Context, key, value)
+}
+
+// AppKey 获取当前应用标识
+// 传入非空 app 参数时直接返回该值（用于显式指定数据域 app）；
+// 不传或为空时回退到 metadata / X-App-Key 请求头解析。
+func (c *ctx) AppKey(app ...string) string {
+	if len(app) > 0 {
+		if v := strings.TrimSpace(app[0]); v != "" {
+			return v
+		}
+	}
+
+	appKey := strings.TrimSpace(c.GetMetadata(AppKeyMetadataKey))
+	if appKey != "" {
+		return appKey
+	}
+
+	header, ok := transport.FromServerContext(c.Context)
+	if !ok {
+		return ""
+	}
+	appKey = strings.TrimSpace(header.RequestHeader().Get(AppKeyHeaderKey))
+	if appKey == "" {
+		return ""
+	}
+	c.SetAppKey(appKey)
+	return appKey
+}
+
+// SetAppKey 设置当前应用标识
+func (c *ctx) SetAppKey(appKey string) {
+	c.SetMetadata(AppKeyMetadataKey, strings.TrimSpace(appKey))
 }
 
 // Config 获取配置对象

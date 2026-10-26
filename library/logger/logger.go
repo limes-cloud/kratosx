@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
+	"time"
 
 	kratoszap "github.com/go-kratos/kratos/contrib/log/zap/v2"
 	"github.com/go-kratos/kratos/v2/log"
@@ -152,6 +154,9 @@ func (l *logger) WithContext(ctx context.Context) Logger {
 
 // Sync 刷新日志
 func (l *logger) Sync() error {
+	if l == nil || l.zap == nil {
+		return nil
+	}
 	return l.zap.Sync()
 }
 
@@ -238,13 +243,25 @@ func newZapLogger(conf *config.Logger) *zap.Logger {
 				if isError {
 					fn = pkg.AppendFileSuffix(conf.File.Name, "_err")
 				}
-				filer, _ := rotatelogs.New(
-					fn+".%Y%m%d%H",
-					rotatelogs.WithLinkName(fn),
-					rotatelogs.WithRotationTime(conf.File.SplitTime),
-					rotatelogs.WithMaxAge(conf.File.MaxAge),
-					rotatelogs.WithRotationCount(conf.File.MaxBackup),
-				)
+				// 确保日志目录存在（rotatelogs 不会创建父目录）
+				if err := os.MkdirAll(filepath.Dir(fn), 0755); err != nil {
+					fmt.Fprintf(os.Stderr, "create log file dir failed: %v\n", err)
+					continue
+				}
+				opts := []rotatelogs.Option{rotatelogs.WithLinkName(fn)}
+				if conf.File.SplitTime > 0 {
+					opts = append(opts, rotatelogs.WithRotationTime(conf.File.SplitTime))
+				}
+				if conf.File.MaxBackup > 0 {
+					opts = append(opts, rotatelogs.WithRotationCount(conf.File.MaxBackup))
+				} else if conf.File.MaxAge > 0 {
+					opts = append(opts, rotatelogs.WithMaxAge(conf.File.MaxAge))
+				}
+				filer, err := rotatelogs.New(fn+".%Y%m%d%H", opts...)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "create log file writer failed: %v\n", err)
+					continue
+				}
 				output = append(output, zapcore.AddSync(filer))
 			}
 
@@ -253,6 +270,10 @@ func newZapLogger(conf *config.Logger) *zap.Logger {
 			}
 		}
 		return output
+	}
+
+	if conf.File != nil && conf.File.MaxAge > 0 && conf.File.MaxAge < time.Second {
+		conf.File.MaxAge *= 24 * time.Hour
 	}
 
 	// // getStdOutputs 获取std输出器

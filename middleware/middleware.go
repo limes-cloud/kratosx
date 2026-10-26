@@ -26,6 +26,8 @@ func New(conf config.Config, hook MidHook) []middleware.Middleware {
 		Metrics(app.Metrics),
 		// 元数据
 		metadata.Server(),
+		// 应用标识
+		AppKey(),
 		// 签名
 		signature.Instance().Server(),
 		// 链路

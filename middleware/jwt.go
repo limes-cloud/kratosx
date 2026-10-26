@@ -15,6 +15,7 @@ import (
 
 	"github.com/limes-cloud/kratosx/config"
 	"github.com/limes-cloud/kratosx/library/jwt"
+	"github.com/limes-cloud/kratosx/pkg/route"
 )
 
 const (
@@ -35,13 +36,17 @@ func Jwt(conf *config.JWT) middleware.Middleware {
 		jwtIns := jwt.Instance()
 		path, method := "", ""
 
-		if tr, ok := transport.FromServerContext(ctx); ok {
-			path = tr.Operation()
-			method = "GRPC"
-		}
 		if h, is := http.RequestFromServerContext(ctx); is {
-			path = h.URL.Path
-			method = h.Method
+			// HTTP：直接用真实路径 + 动词
+			path, method = h.URL.Path, h.Method
+		} else if tr, ok := transport.FromServerContext(ctx); ok {
+			// gRPC：优先按 google.api.http 注解把 operation 翻成 HTTP method+path，
+			// 使白名单与 HTTP 共用一套 key；无 HTTP 绑定的纯 gRPC 维持 operation + "GRPC"。
+			if r, has := route.Lookup(tr.Operation()); has {
+				path, method = r.Path, r.Method
+			} else {
+				path, method = tr.Operation(), "GRPC"
+			}
 		}
 
 		return jwtIns.IsWhitelist(path, method)

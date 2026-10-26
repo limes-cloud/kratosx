@@ -18,7 +18,7 @@ type App struct {
 		TLS      *TLS         // TLS配置
 	}
 	Signature      *Signature          // 签名配置
-	Logger         *Logger             // 日志配置
+	Logger         *Logger             `mapstructure:"log"` // 日志配置
 	Pool           *Pool               // 连接池配置
 	Email          *Email              // 邮件配置
 	JWT            *JWT                // JWT配置
