@@ -126,7 +126,11 @@ func (app *App) App() *kratos.App {
 		}
 		// webServer
 		if app.config.App().Server.Http.WebServerDir != "" {
-			web.Server(app.config.App().Server.Http.WebServerDir, hs)
+			web.Server(
+				app.config.App().Server.Http.WebServerDir,
+				hs,
+				web.WithInjections(app.config.App().Server.Http.Injection),
+			)
 		}
 	}
 	if srv.Grpc != nil {

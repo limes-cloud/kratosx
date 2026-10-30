@@ -62,6 +62,14 @@ type HttpService struct {
 	Marshal        *Marshal
 	Pprof          *Pprof
 	WebServerDir   string
+	Injection      []*WebInjection `mapstructure:"injection"`
+}
+
+// WebInjection 描述静态页面中的注释替换。
+type WebInjection struct {
+	Marker string `mapstructure:"marker"`
+	Value  any    `mapstructure:"value"`
+	Type   string `mapstructure:"type"`
 }
 
 type Pprof struct {
